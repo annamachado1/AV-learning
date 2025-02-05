@@ -1,5 +1,4 @@
-
-name: geometric-shapes
+name: NovelStimuli
 channels:
   - conda-forge
   - defaults
@@ -7,3 +6,17 @@ dependencies:
   - python=3.9
   - matplotlib
   - numpy
+  - psychopy
+  - wxpython
+  - pyopengl
+  - pillow
+  - scipy
+  - pip
+  - pip:
+    - pyglet
+    - soundfile
+    - python-vlc
+    - pygame
+    - psychtoolbox
+    - sounddevice
+    - pyo

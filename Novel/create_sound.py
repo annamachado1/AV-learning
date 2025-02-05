@@ -28,7 +28,7 @@ def save_tones_with_unique_frequencies():
 
     for i, frequency in enumerate(FREQUENCIES):
         wave = generate_sine_wave(frequency)
-        filename = f"generated_tones/tone_{i+1:02d}_{int(frequency)}Hz.wav"
+        filename = f"generated_tones/tone_{i+1:02d}.wav"
         wave = np.int16(wave * 32767)  # Convert to 16-bit PCM
         wav.write(filename, SAMPLE_RATE, wave)
         print(f"Saved: {filename}")
