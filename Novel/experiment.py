@@ -1,11 +1,10 @@
-import pyglet
-pyglet.options['shadow_window'] = False
+# Removed pyglet import and options since they're not needed in the updated environment.
 import os
 import random
 from psychopy import visual, core, event, sound, prefs
 
-# Configure sound preferences - try multiple backends
-prefs.hardware['audioLib'] = ['PTB', 'sounddevice', 'pygame']
+# Configure sound preferences - now using sounddevice and pygame
+prefs.hardware['audioLib'] = ['sounddevice', 'pygame']
 prefs.general['audioDevice'] = ['default']
 
 # Set the path where images and sounds are stored
