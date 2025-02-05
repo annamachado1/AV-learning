@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import random
 
 def generate_max_complexity_polygon(num_sides=18, distortion=0.7, concavity=0.8, jaggedness=0.8):
     """Generate a highly complex irregular polygon."""
