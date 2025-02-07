@@ -11,11 +11,10 @@ prefs.general['audioDevice'] = ['default']
 image_dir = "/Users/annamachado/Documents/GitHub/AV-learning/Novel/generated_shapes"
 audio_dir = "/Users/annamachado/Documents/GitHub/AV-learning/Novel/generated_tones"
 
-# Generate ordered list of paired stimuli
+# Generate ordered list of paired stimuli (each appearing 5 times)
 stimuli_pairs = [(f"shape_{i:02d}.png", f"tone_{i:02d}.wav") for i in range(1, 11)]
-
-# Randomize the order of presentation for Block 1
-random.shuffle(stimuli_pairs)
+all_trials = stimuli_pairs * 5  # Each pair appears 5 times
+random.shuffle(all_trials)  # Completely randomize order
 
 # Create a PsychoPy window
 try:
@@ -25,19 +24,19 @@ except Exception as e:
     core.quit()
 
 # Function to display instructions
-def show_instructions(text):
+def show_instructions(text, allow_skip=False):
     instructions = visual.TextStim(win, text=text, color="white", height=40)
     instructions.draw()
     win.flip()
     while True:
-        keys = event.waitKeys(keyList=["space", "escape", "s"])
+        keys = event.waitKeys(keyList=["space", "escape", "s"] if allow_skip else ["space", "escape"])
         if "escape" in keys:
             win.close()
             core.quit()
-        elif "s" in keys:
-            return 'skip'  # Skip current block
+        elif "s" in keys and allow_skip:
+            return 'skip'
         elif "space" in keys:
-            return 'continue'  # Proceed normally
+            return 'continue'  
 
 # First block: Passive viewing of shapes and sounds
 def block_one():
@@ -49,21 +48,18 @@ def block_one():
         "Press SPACEBAR to begin when you are ready."
     )
 
-    if show_instructions(instructions_text) == 'skip':
+    if show_instructions(instructions_text, allow_skip=True) == 'skip':
         return 'skip'
 
     fixation = visual.TextStim(win, text="+", color="white", height=50)
-    for img_file, audio_file in stimuli_pairs:
-        keys = event.getKeys(keyList=["escape", "s"])
-        if "escape" in keys:
+    for img_file, audio_file in all_trials:
+        if "escape" in event.getKeys():
             win.close()
             core.quit()
-        if "s" in keys:
-            return 'skip'  # Skip Block 1 immediately
 
         fixation.draw()
         win.flip()
-        core.wait(3)
+        core.wait(0.5) # Fixation cross appears for 500ms
 
         image_path = os.path.join(image_dir, img_file)
         audio_path = os.path.join(audio_dir, audio_file)
@@ -71,17 +67,17 @@ def block_one():
         if os.path.exists(image_path) and os.path.exists(audio_path):
             img_stim = visual.ImageStim(win, image=image_path)
             try:
-                sound_stim = sound.Sound(audio_path, secs=1.0, stereo=True, hamming=True)
+                sound_stim = sound.Sound(audio_path, secs=1, stereo=True, hamming=True)
                 img_stim.draw()
                 win.flip()
                 sound_stim.play()
-                core.wait(1.0)
+                core.wait(1)
                 sound_stim.stop()
             except Exception as e:
                 print(f"Error playing sound {audio_file}: {str(e)}")
                 img_stim.draw()
                 win.flip()
-                core.wait(1.0)  # Default duration if sound fails
+                core.wait(1)  # Default duration (1s) if sound fails
 
     return 'done'
 
@@ -95,86 +91,54 @@ def block_two():
         "Please respond as quickly as possible.\n\n"
         "Press SPACEBAR to continue."
     )
-
-    if show_instructions(instructions_text) == 'skip':
-        return
-
-    results = []
+    show_instructions(instructions_text)
+    
     for img_file, audio_file in stimuli_pairs:
-        keys = event.getKeys(keyList=["escape", "s"])
-        if "escape" in keys:
+        if "escape" in event.getKeys():
             win.close()
             core.quit()
-        if "s" in keys:
-            return  # Skip Block 2 immediately
-
-        # Ensure correct tone is used
-        correct_tone = audio_file
-
-        # Pick a random incorrect tone (ensuring it's not the correct one)
-        available_tones = [f"tone_{i:02d}.wav" for i in range(1, 11) if f"tone_{i:02d}.wav" != correct_tone]
-        incorrect_tone = random.choice(available_tones)
-
-        # Randomly order the two tones
-        random_tones = [correct_tone, incorrect_tone]
-        random.shuffle(random_tones)
-
+        
         image_path = os.path.join(image_dir, img_file)
         img_stim = visual.ImageStim(win, image=image_path)
         img_stim.draw()
         win.flip()
+        core.wait(1)
+
+        # Pick a random incorrect tone
+        available_tones = [f"tone_{i:02d}.wav" for i in range(1, 11) if f"tone_{i:02d}.wav" != audio_file]
+        incorrect_tone = random.choice(available_tones)
+        
+        # Randomly order the two tones
+        tones = [audio_file, incorrect_tone]
+        random.shuffle(tones)
 
         # Play first tone
-        tone1 = sound.Sound(os.path.join(audio_dir, random_tones[0]), secs=2.0)
+        tone1 = sound.Sound(os.path.join(audio_dir, tones[0]), secs=1.0)
         tone1.play()
-        core.wait(2)
+        core.wait(1)
+        tone1.stop()
+
+        # Pause before second tone
+        core.wait(0.5)
 
         # Play second tone
-        tone2 = sound.Sound(os.path.join(audio_dir, random_tones[1]), secs=2.0)
+        tone2 = sound.Sound(os.path.join(audio_dir, tones[1]), secs=1.0)
         tone2.play()
-        core.wait(2)
+        core.wait(1)
+        tone2.stop()
 
-        # Display response prompt
-        response_prompt = visual.TextStim(
-            win, 
-            text="Press 1 if the first tone matches.\nPress 2 if the second tone matches.", 
-            color="white", 
-            height=30
-        )
+        response_prompt = visual.TextStim(win, text="Press 1 if the first tone matches.\nPress 2 if the second tone matches.", color="white", height=30)
         response_prompt.draw()
         win.flip()
-
-        start_time = core.getTime()
-        keys = event.waitKeys(keyList=["1", "2", "s", "escape"])
-
-        if "escape" in keys:
+        if "escape" in event.waitKeys(keyList=["1", "2", "escape"]):
             win.close()
             core.quit()
-        if "s" in keys:
-            return  # Skip remaining trials and end the experiment
-
-        response = keys[0] if keys else None
-        rt = core.getTime() - start_time if response else None
-
-        # Store the trial data
-        results.append({
-            "shape": img_file,
-            "tone1": random_tones[0],
-            "tone2": random_tones[1],
-            "response": response,
-            "reaction_time": rt,
-            "correct_tone": correct_tone,
-            "incorrect_tone": incorrect_tone,
-            "correct_answer": "1" if random_tones[0] == correct_tone else "2"
-        })
-
-    # Save results to Excel
-    results_df = pd.DataFrame(results)
-    results_df.to_excel("participant_responses.xlsx", index=False)
 
 # Run experiment in sequence
-if block_one() != 'skip':
-    show_instructions("Second block. Press SPACE to continue.")
+block_one_result = block_one()
+if block_one_result == 'skip' or block_one_result == 'done':
+    show_instructions("Second Block: Matching Task.\n\n"
+                      "Press SPACEBAR to continue.")
     block_two()
 
 # Cleanup
