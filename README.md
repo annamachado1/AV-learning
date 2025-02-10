@@ -22,9 +22,11 @@ This aim will identify **developmental differences** in both **semantic binding 
 The experiment consists of **2 blocks**:
 
 ### 1️⃣ Passive Viewing Block
-- Participants **see** a shape and **hear** its corresponding tone.
-- There are 10 audiovisual pairings shown to participants 5 times in a randomised fashion.
-- No response is required—participants simply observe and listen.
+- Participants **see** 10 shapes arranged in a **grid**.
+- They can **click on any shape** to hear its corresponding tone.
+- There is **no time limit per click**—participants can explore freely.
+- This phase lasts **60 seconds**, after which it **automatically ends**.
+- No responses are required—participants simply explore and listen.
 
 ### 2️⃣ Forced-Choice Matching Task
 - Participants are shown a shape and hear **two tones** (one correct, one incorrect).
