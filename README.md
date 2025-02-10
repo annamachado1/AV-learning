@@ -43,7 +43,7 @@ Participants can **press `ESC` to exit** at any time.
 
 ### 1️⃣ Clone the Repository
 
-git clone https://github.com/yourusername/AV-learning.git
+git clone https://github.com/annamachado1/AV-learning.git
 
 cd AV-learning
 
