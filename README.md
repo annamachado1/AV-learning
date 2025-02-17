@@ -21,12 +21,20 @@ This aim will identify **developmental differences** in both **semantic binding 
 
 The experiment consists of **2 blocks**:
 
-### 1️⃣ Passive Viewing Block
+### 1 Passive Viewing Block
 - Participants **see** 10 shapes arranged in a **grid**.
 - They can **click on any shape** to hear its corresponding tone.
 - There is **no time limit per click**—participants can explore freely.
 - This phase lasts **60 seconds**, after which it **automatically ends**.
 - No responses are required—participants simply explore and listen.
+
+
+### 2 Active Learning Block
+- Participants see multiple shapes on the screen at once.
+- They can click on any shape to hear its corresponding tone.
+- Exploration is self-paced within a fixed time limit (60 seconds).
+- Participants can click on shapes multiple times to reinforce learning.
+- The goal is to learn the pairings before the matching task.
 
 ### 2️⃣ Forced-Choice Matching Task
 - Participants are shown a shape and hear **two tones** (one correct, one incorrect).
@@ -43,7 +51,7 @@ Participants can **press `ESC` to exit** at any time.
 
 ### 1️⃣ Clone the Repository
 
-git clone https://github.com/yourusername/AV-learning.git
+git clone https://github.com/annamachado1/AV-learning.git
 
 cd AV-learning
 

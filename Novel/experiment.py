@@ -74,10 +74,11 @@ def main_menu():
 def block_one_passive():
     instructions_text = (
         "Instructions: \n\n"
-        "In this part of the experiment, you will see shapes on the screen paired with sounds. "
-        "Your task is to pay close attention to the sound that corresponds to each shape."
-        "There is no need to respond during this block.\n\n"
-        "Press SPACEBAR to begin when you are ready."
+        "In this part of the experiment, you will see several shapes on the screen. "
+        "Your task is to click on any shape to hear the sound paired with it. "
+        "You can click on multiple shapes as many times as you like.\n\n"
+        "Explore freely and try to remember the pairings.\n\n"
+        "Press SPACEBAR to continue."
     )
 
     show_instructions(instructions_text, ["space"])
@@ -94,7 +95,6 @@ def block_one_passive():
 
         image_path = os.path.join(image_dir, img_file)
         audio_path = os.path.join(audio_dir, audio_file)
-
         if os.path.exists(image_path) and os.path.exists(audio_path):
             img_stim = visual.ImageStim(win, image=image_path, size=(300, 300))  # Set smaller display size
             try:
@@ -205,61 +205,14 @@ def block_two():
     )
     show_instructions(instructions_text)
     
-    for img_file, audio_file in stimuli_pairs:
-        if "escape" in event.getKeys():
-            win.close()
-            core.quit()
-        
-        image_path = os.path.join(image_dir, img_file)
-        img_stim = visual.ImageStim(win, image=image_path, size=(300, 300))  # Smaller shape display
-        
-        # Start timing the trial
-        trial_clock = core.Clock()
-        
-        # Display shape for 1s
-        img_stim.draw()
+    
+    exploration_time = 60  # allow 60 seconds for processing
+    timer = core.Clock()
+    
+    while timer.getTime() < exploration_time:
+        for img_stim, _ in stimuli_objects:
+            img_stim.draw()
         win.flip()
-        core.wait(1)
-        
-        # Pick a random incorrect tone
-        available_tones = [f"tone_{i:02d}.wav" for i in range(1, 11) if f"tone_{i:02d}.wav" != audio_file]
-        incorrect_tone = random.choice(available_tones)
-        
-        # Randomly order the two tones
-        tones = [audio_file, incorrect_tone]
-        random.shuffle(tones)
-        correct_answer = "1" if tones[0] == audio_file else "2"
-
-        # Play first tone
-        tone1 = sound.Sound(os.path.join(audio_dir, tones[0]), secs=1.0)
-        tone1.play()
-        core.wait(1)
-        tone1.stop()
-
-        # Pause before second tone
-        core.wait(0.5)
-
-        # Play second tone
-        tone2 = sound.Sound(os.path.join(audio_dir, tones[1]), secs=1.0)
-        tone2.play()
-        core.wait(1)
-        tone2.stop()
-
-        # Show response prompt
-        response_prompt = visual.TextStim(win, text="Press 1 if the first tone matches.\nPress 2 if the second tone matches.", color="white", height=30)
-        response_prompt.draw()
-        win.flip()
-
-        # Wait for response but limit total trial duration to 5 seconds
-        response = None
-        while trial_clock.getTime() < 5:
-            keys = event.getKeys(keyList=["1", "2", "escape"])
-            if "escape" in keys:
-                win.close()
-                core.quit()
-            elif keys:
-                response = keys[0]
-                break
         
         # Determine correctness
         if response == correct_answer:
