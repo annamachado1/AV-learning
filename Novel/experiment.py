@@ -1,6 +1,8 @@
 import os
 import random
 import pandas as pd
+import csv
+import time
 from psychopy import visual, core, event, sound, prefs
 
 # Configure sound preferences
@@ -10,6 +12,16 @@ prefs.general['audioDevice'] = ['default']
 # Set the path where images and sounds are stored
 image_dir = "./generated_shapes"
 audio_dir = "./generated_tones"
+
+# Store participant data
+participant_data = {
+    "task order": "",
+    "time on active task": 0,
+    "click data": {},
+    "block 2 correct": 0,
+    "block 2 incorrect": 0,
+    "reaction time": [],
+}
 
 # Generate ordered list of paired stimuli (each appearing 5 times)
 stimuli_pairs = [(f"shape_{i:02d}.png", f"tone_{i:02d}.wav") for i in range(1, 11)]
@@ -74,11 +86,10 @@ def main_menu():
 def block_one_passive():
     instructions_text = (
         "Instructions: \n\n"
-        "In this part of the experiment, you will see several shapes on the screen. "
-        "Your task is to click on any shape to hear the sound paired with it. "
-        "You can click on multiple shapes as many times as you like.\n\n"
-        "Explore freely and try to remember the pairings.\n\n"
-        "Press SPACEBAR to continue."
+        "In this part of the experiment, you will see shapes on the screen paired with sounds. "
+        "Your task is to pay close attention to the sound that corresponds to each shape."
+        "There is no need to respond during this block.\n\n"
+        "Press SPACEBAR to begin when you are ready."
     )
 
     show_instructions(instructions_text, ["space"])
@@ -114,22 +125,30 @@ def block_one_passive():
 
 # First block: Active viewing of shapes and sounds
 def block_one_active():
+    global participant_data
+    
     instructions_text = (
         "Instructions: \n\n"
-        "Click on any shape to hear the sound paired with it.\n"
+        "In this part of the experiment, you will see several shapes on the screen. "
+        "Your task is to click on any shape to hear the sound paired with it. "
+        "You can click on multiple shapes as many times as you like."
         "Press the quit button to quit and continue to the next block.\n\n"
+        "Explore freely and try to remember the pairings.\n\n"
         "Press SPACEBAR to start."
     )
 
     if show_instructions(instructions_text, ["space"]) != "continue":
         return "skip"
     
+    participant_data["task order"] = "active"
+    
+    start_time = time.time()
+        
     grid_positions = [(-450, 200), (-225, 200), (0, 200), (225, 200), (450, 200),
                       (-450, -200), (-225, -200), (0, -200), (225, -200), (450, -200)]
     random.shuffle(grid_positions)
 
     stimuli_objects = []
-    click_data = {}  # Dictionary to track clicks
     
     for idx, (img_file, audio_file) in enumerate(stimuli_pairs):
         image_path = os.path.join(image_dir, img_file)
@@ -138,7 +157,7 @@ def block_one_active():
             img_stim = visual.ImageStim(win, image=image_path, pos=grid_positions[idx], size=(200, 200))
             sound_stim = sound.Sound(audio_path, secs=1.0, stereo=True, hamming=True)
             stimuli_objects.append((img_stim, sound_stim))
-            click_data[img_file] = 0  # Initialize click count
+            participant_data["click data"][img_file] = {"clicks": 0}
 
     # Create a timer display
     timer_display = visual.TextStim(win, text="Time Left: 10:00", color="white", pos=(0, 400), height=40)
@@ -174,10 +193,12 @@ def block_one_active():
                     sound_stim.play()
                     core.wait(1.0)
                     sound_stim.stop()
-                    click_data[img_stim.image.split("/")[-1]] += 1  # Increment click count
+                    img_file = img_stim.image.split("/")[-1]
+                    participant_data["click data"][img_file]["clicks"] += 1  # Log clicks
             
             # Check if quit button was clicked
             if quit_button.contains(mouse):
+                participant_data["time on active task"] = round(time.time() - start_time, 2)
                 print("Exiting block one active...")
                 return 'done'
 
@@ -186,15 +207,15 @@ def block_one_active():
             win.close()
             core.quit()
 
-    print("Click Data:", click_data)  # Click statistics
-    print("Time Spent:", timer.getTime(), "seconds")  # Time spent
-
-    return 'done'
-
+    # End timing
+    participant_data["time on active task"] = round(time.time() - start_time, 2)  # Store time spent
+    return "done"
     
 
 # Second block: Matching task with timing & feedback
 def block_two():
+    global participant_data
+    
     instructions_text = (
         "Instructions: \n\n"
         "In this part of the experiment, you will see a shape and hear two tones played one after the other. "
@@ -205,7 +226,39 @@ def block_two():
     )
     show_instructions(instructions_text, ["space"])
     
-    for img_file, audio_file in stimuli_pairs:
+    total_trials = len(stimuli_pairs)  # Total number of trials
+    correct_answers = 0  # Track correct answers
+
+    bar_width = 400
+    bar_height = 30
+    bar_y = -200   # vertical position of the blocks
+    blocks = []
+    
+    block_w = bar_width / total_trials
+    block_h = bar_height
+    # Left edge for the first block center
+    left_edge = -bar_width / 2
+    
+    for i in range(total_trials):
+        center_x = left_edge + (i + 0.5) * block_w
+        center_y = bar_y
+        
+        x1 = center_x - block_w/2
+        x2 = center_x + block_w/2
+        y1 = center_y - block_h/2
+        y2 = center_y + block_h/2
+        
+        block_shape = visual.ShapeStim(
+            win,
+            vertices=[(x1, y1), (x2, y1), (x2, y2), (x1, y2)],
+            fillColor='darkgrey',
+            lineColor='white', 
+            closeShape=True
+        )
+        blocks.append(block_shape)
+
+    
+    for trial_index, (img_file, audio_file) in enumerate(stimuli_pairs):
         if "escape" in event.getKeys():
             win.close()
             core.quit()
@@ -218,6 +271,8 @@ def block_two():
         
         # Display shape for 1s
         img_stim.draw()
+        for b in blocks:
+            b.draw()
         win.flip()
         core.wait(1)
         
@@ -228,7 +283,6 @@ def block_two():
         # Randomly order the two tones
         tones = [audio_file, incorrect_tone]
         random.shuffle(tones)
-        correct_answer = "1" if tones[0] == audio_file else "2"
 
         # Play first tone
         tone1 = sound.Sound(os.path.join(audio_dir, tones[0]), secs=1.0)
@@ -248,8 +302,12 @@ def block_two():
         # Show response prompt
         response_prompt = visual.TextStim(win, text="Press 1 if the first tone matches.\nPress 2 if the second tone matches.", color="white", height=30)
         response_prompt.draw()
+        for b in blocks:
+            b.draw()
         win.flip()
 
+        # Start reaction time tracking
+        trial_clock.reset()
         # Wait for response but limit total trial duration to 5 seconds
         response = None
         while trial_clock.getTime() < 5:
@@ -260,21 +318,48 @@ def block_two():
             elif keys:
                 response = keys[0]
                 break
+
+            
+        reaction_time = round(trial_clock.getTime(), 3)
+        participant_data["reaction time"].append(reaction_time)
         
-        # Determine correctness
+        correct_answer = "1" if tones[0] == audio_file else "2"
         if response == correct_answer:
-            feedback_img = "green_tick.png"  # Replace with actual image path
-            correct = True
+            participant_data["block 2 correct"] += 1
+            correct_answers += 1
+            blocks[trial_index].fillColor = "green"
         else:
-            feedback_img = "red_cross.png"  # Replace with actual image path
-            correct = False
+            participant_data["block 2 incorrect"] += 1
+            blocks[trial_index].fillColor = "red"
+
+        # Show feedback
+        feedback_img = "green_tick.png" if response == correct_answer else "red_cross.png"
+        feedback_stim = visual.ImageStim(win, image=feedback_img, size=(150, 150))
         
-        # Show feedback for 1 second
-        feedback_stim = visual.ImageStim(win, image=feedback_img, size=(150, 150))  # Smaller feedback icons
         feedback_stim.draw()
+        for b in blocks:
+            b.draw()
         win.flip()
         core.wait(1)
         
+        
+def save_results():
+    filename = f"participant_data_{time.strftime('%Y%m%d-%H%M%S')}.csv"
+    
+    with open(filename, mode="w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["Task Order", "Time on Active Task (s)", "Block 2 Correct", "Block 2 Incorrect", "Reaction Times"])
+        writer.writerow([participant_data["task order"], participant_data["time on active task"], 
+                         participant_data["block 2 correct"], participant_data["block 2 incorrect"], participant_data["reaction time"]])
+        
+        writer.writerow([])  # Separation
+        writer.writerow(["Image Click Data"])
+        writer.writerow(["Image", "Clicks"])
+        
+        for img, data in participant_data["click data"].items():
+            writer.writerow([img, data["clicks"]])
+
+
 # Run Experiment
 choice = main_menu()
 if choice == "passive":
@@ -285,6 +370,8 @@ else:
 show_instructions("Second Block: Matching Task.\n\n"
                       "Press SPACEBAR to continue.", ["space"])
 block_two()
+
+save_results()
 
 # Cleanup
 win.close()
