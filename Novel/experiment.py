@@ -37,20 +37,6 @@ except Exception as e:
     print(f"Error creating window: {str(e)}")
     core.quit()
 
-# # Function to display instructions
-# def show_instructions(text, allow_skip=False):
-#     instructions = visual.TextStim(win, text=text, color="white", height=40)
-#     instructions.draw()
-#     win.flip()
-#     while True:
-#         keys = event.waitKeys(keyList=["space", "escape", "s"] if allow_skip else ["space", "escape"])
-#         if "escape" in keys:
-#             win.close()
-#             core.quit()
-#         elif "s" in keys and allow_skip:
-#             return 'skip'
-#         elif "space" in keys:
-#             return 'continue'
 def show_instructions(text, continue_keys=["1", "2", "space"]):
     instructions = visual.TextStim(win, text=text, color="white", height=0.06, pos=(0, 0))
     instructions.draw()
@@ -107,7 +93,7 @@ def block_one_passive():
         image_path = os.path.join(image_dir, img_file)
         audio_path = os.path.join(audio_dir, audio_file)
         if os.path.exists(image_path) and os.path.exists(audio_path):
-            img_stim = visual.ImageStim(win, image=image_path, size=(0.3, 0.3), pos=(0,0))  # Set smaller display size
+            img_stim = visual.ImageStim(win, image=image_path, size=(0.25, 0.35), pos=(0,0))  # Set smaller display size
             try:
                 sound_stim = sound.Sound(audio_path, secs=1, stereo=True, hamming=True)
                 img_stim.draw()
