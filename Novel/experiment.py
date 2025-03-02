@@ -30,8 +30,8 @@ random.shuffle(all_trials)  # Completely randomize order
 
 # Create a PsychoPy window
 try:
-    win = visual.Window(fullscr=True, color="black", units="pix", monitor='testMonitor', allowGUI=True)
-    # win = visual.Window(size=[1600, 1200], color="black", units="pix", allowGUI=True, pos=[0, 0])
+    win = visual.Window(fullscr=True, color="black", units="norm", monitor='testMonitor', allowGUI=True)
+    # win = visual.Window(size=[1200, 800], color="black", units="norm", allowGUI=True, pos=[0, 0])
 
 except Exception as e:
     print(f"Error creating window: {str(e)}")
@@ -52,7 +52,7 @@ except Exception as e:
 #         elif "space" in keys:
 #             return 'continue'
 def show_instructions(text, continue_keys=["1", "2", "space"]):
-    instructions = visual.TextStim(win, text=text, color="white", height=40)
+    instructions = visual.TextStim(win, text=text, color="white", height=0.06, pos=(0, 0))
     instructions.draw()
     win.flip()
     
@@ -94,7 +94,7 @@ def block_one_passive():
 
     show_instructions(instructions_text, ["space"])
 
-    fixation = visual.TextStim(win, text="+", color="white", height=50)
+    fixation = visual.TextStim(win, text="+", color="white", height=0.1, pos=(0, 0))
     for img_file, audio_file in all_trials:
         if "escape" in event.getKeys():
             win.close()
@@ -107,7 +107,7 @@ def block_one_passive():
         image_path = os.path.join(image_dir, img_file)
         audio_path = os.path.join(audio_dir, audio_file)
         if os.path.exists(image_path) and os.path.exists(audio_path):
-            img_stim = visual.ImageStim(win, image=image_path, size=(300, 300))  # Set smaller display size
+            img_stim = visual.ImageStim(win, image=image_path, size=(0.3, 0.3), pos=(0,0))  # Set smaller display size
             try:
                 sound_stim = sound.Sound(audio_path, secs=1, stereo=True, hamming=True)
                 img_stim.draw()
@@ -144,8 +144,10 @@ def block_one_active():
     
     start_time = time.time()
         
-    grid_positions = [(-450, 200), (-225, 200), (0, 200), (225, 200), (450, 200),
-                      (-450, -200), (-225, -200), (0, -200), (225, -200), (450, -200)]
+    grid_positions = [
+        (-0.6,  0.25), (-0.3,  0.25), (0.0,  0.25), (0.3,  0.25), (0.6,  0.25),
+        (-0.6, -0.25), (-0.3, -0.25), (0.0, -0.25), (0.3, -0.25), (0.6, -0.25)
+    ]
     random.shuffle(grid_positions)
 
     stimuli_objects = []
@@ -154,18 +156,33 @@ def block_one_active():
         image_path = os.path.join(image_dir, img_file)
         audio_path = os.path.join(audio_dir, audio_file)
         if os.path.exists(image_path) and os.path.exists(audio_path):
-            img_stim = visual.ImageStim(win, image=image_path, pos=grid_positions[idx], size=(200, 200))
+            img_stim = visual.ImageStim(win, image=image_path, pos=grid_positions[idx], size=(0.25, 0.35))
             sound_stim = sound.Sound(audio_path, secs=1.0, stereo=True, hamming=True)
             stimuli_objects.append((img_stim, sound_stim))
             participant_data["click data"][img_file] = {"clicks": 0}
 
     # Create a timer display
-    timer_display = visual.TextStim(win, text="Time Left: 10:00", color="white", pos=(0, 400), height=40)
+    timer_display = visual.TextStim(win, text="Time Left: 10:00", color="white", pos=(0, 0.75), height=0.07)
+    
+    quit_button_vertices = [
+        (-0.1, -0.05), (0.1, -0.05),
+        (0.1, 0.05),   (-0.1, 0.05)
+    ]
 
-    # Create a Quit button
-    quit_button = visual.ShapeStim(win, vertices=[(-75, 25), (75, 25), (75, -25), (-75, -25)], fillColor="white", pos=(750, 400))
-
-    quit_text = visual.TextStim(win, text="Quit", color="black", pos=(750, 400), height=30)
+    quit_button = visual.ShapeStim(
+        win,
+        vertices=quit_button_vertices,
+        fillColor="white",
+        pos=(0.75, 0.75),
+        closeShape=True
+    )
+    quit_text = visual.TextStim(
+        win,
+        text="Quit",
+        color="black",
+        pos=(0.75, 0.75),
+        height=0.07
+    )
 
     timer = core.Clock()
     max_time = 600  # 10 minutes (600 seconds)
@@ -227,36 +244,48 @@ def block_two():
     show_instructions(instructions_text, ["space"])
     
     total_trials = len(stimuli_pairs)  # Total number of trials
-    correct_answers = 0  # Track correct answers
+    progress_value = 0.0
 
-    bar_width = 400
-    bar_height = 30
-    bar_y = -200   # vertical position of the blocks
-    blocks = []
+    bar_width = 0.8
+    bar_height = 0.1
+    bar_y = -0.7
+    left_edge = -bar_width / 2.0
     
-    block_w = bar_width / total_trials
-    block_h = bar_height
-    # Left edge for the first block center
-    left_edge = -bar_width / 2
+    y1_bg = bar_y - bar_height / 2
+    y2_bg = bar_y + bar_height / 2
     
-    for i in range(total_trials):
-        center_x = left_edge + (i + 0.5) * block_w
-        center_y = bar_y
+    progress_bg = visual.ShapeStim(
+        win,
+        vertices=[
+            (left_edge, y1_bg),
+            (left_edge+bar_width, y1_bg),
+            (left_edge+bar_width, y2_bg),
+            (left_edge, y2_bg)
+        ],
+        fillColor='darkgrey',
+        lineColor='white',
+        closeShape=True
+    )
+    
+    def create_progress_bar(p_value):
+        # p_value represents the fraction of bar_width to fill.
+        x1 = left_edge
+        x2 = left_edge + (p_value * bar_width)
+        fillColor = 'blue'
+        vertices = [(x1, bar_y - bar_height/2),
+                    (x2, bar_y - bar_height/2),
+                    (x2, bar_y + bar_height/2),
+                    (x1, bar_y + bar_height/2)]
         
-        x1 = center_x - block_w/2
-        x2 = center_x + block_w/2
-        y1 = center_y - block_h/2
-        y2 = center_y + block_h/2
-        
-        block_shape = visual.ShapeStim(
+        return visual.ShapeStim(
             win,
-            vertices=[(x1, y1), (x2, y1), (x2, y2), (x1, y2)],
-            fillColor='darkgrey',
-            lineColor='white', 
+            vertices=vertices,
+            fillColor=fillColor,
+            lineColor=None,
             closeShape=True
         )
-        blocks.append(block_shape)
-
+    
+    progress_bar = create_progress_bar(progress_value)
     
     for trial_index, (img_file, audio_file) in enumerate(stimuli_pairs):
         if "escape" in event.getKeys():
@@ -264,15 +293,15 @@ def block_two():
             core.quit()
         
         image_path = os.path.join(image_dir, img_file)
-        img_stim = visual.ImageStim(win, image=image_path, size=(300, 300))  # Smaller shape display
+        img_stim = visual.ImageStim(win, image=image_path, size=(0.3, 0.4), pos=(0, 0))  # Smaller shape display
         
         # Start timing the trial
         trial_clock = core.Clock()
         
         # Display shape for 1s
         img_stim.draw()
-        for b in blocks:
-            b.draw()
+        progress_bg.draw()
+        progress_bar.draw()
         win.flip()
         core.wait(1)
         
@@ -300,10 +329,16 @@ def block_two():
         tone2.stop()
 
         # Show response prompt
-        response_prompt = visual.TextStim(win, text="Press 1 if the first tone matches.\nPress 2 if the second tone matches.", color="white", height=30)
+        response_prompt = visual.TextStim(
+            win,
+            text="Press 1 if the first tone matches.\nPress 2 if the second tone matches.",
+            color="white",
+            height=0.05,
+            pos=(0, 0)
+        )
         response_prompt.draw()
-        for b in blocks:
-            b.draw()
+        progress_bg.draw()
+        progress_bar.draw()
         win.flip()
 
         # Start reaction time tracking
@@ -326,19 +361,21 @@ def block_two():
         correct_answer = "1" if tones[0] == audio_file else "2"
         if response == correct_answer:
             participant_data["block 2 correct"] += 1
-            correct_answers += 1
-            blocks[trial_index].fillColor = "green"
+            # progress_value += 1.0 / total_trials
         else:
             participant_data["block 2 incorrect"] += 1
-            blocks[trial_index].fillColor = "red"
+            # progress_value = max(0, progress_value - (1.0 / total_trials))
+            
+        progress_value += 1.0 / total_trials    
+        progress_bar = create_progress_bar(progress_value)
 
         # Show feedback
         feedback_img = "green_tick.png" if response == correct_answer else "red_cross.png"
-        feedback_stim = visual.ImageStim(win, image=feedback_img, size=(150, 150))
+        feedback_stim = visual.ImageStim(win, image=feedback_img, size=(0.2, 0.3), pos=(0, 0))
         
         feedback_stim.draw()
-        for b in blocks:
-            b.draw()
+        progress_bg.draw()
+        progress_bar.draw()
         win.flip()
         core.wait(1)
         
