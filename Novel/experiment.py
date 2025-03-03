@@ -232,8 +232,8 @@ def block_two():
     total_trials = len(stimuli_pairs)  # Total number of trials
     progress_value = 0.0
 
-    bar_width = 0.8
-    bar_height = 0.1
+    bar_width = 0.5
+    bar_height = 0.07
     bar_y = -0.7
     left_edge = -bar_width / 2.0
     
