@@ -30,8 +30,8 @@ random.shuffle(all_trials)  # Completely randomize order
 
 # Create a PsychoPy window
 try:
-    win = visual.Window(fullscr=True, color="black", units="norm", monitor='testMonitor', allowGUI=True)
-    # win = visual.Window(size=[1200, 800], color="black", units="norm", allowGUI=True, pos=[0, 0])
+    win = visual.Window(fullscr=True, color="gray", units="norm", monitor='testMonitor', allowGUI=True)
+    # win = visual.Window(size=[1200, 800], color="gray", units="norm", allowGUI=True, pos=[0, 0])
 
 except Exception as e:
     print(f"Error creating window: {str(e)}")
