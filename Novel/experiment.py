@@ -24,7 +24,7 @@ participant_data = {
 }
 
 # Generate ordered list of paired stimuli (each appearing 5 times)
-stimuli_pairs = [(f"shape_{i:02d}.png", f"tone_{i:02d}.wav") for i in range(1, 11)]
+stimuli_pairs = [(f"shape_{i:02d}.png", f"sound_{i:01d}.wav") for i in range(1, 11)]
 all_trials = stimuli_pairs * 5  # Each pair appears 5 times
 random.shuffle(all_trials)  # Completely randomize order
 
@@ -116,10 +116,10 @@ def block_one_active():
     instructions_text = (
         "Instructions: \n\n"
         "In this part of the experiment, you will see several shapes on the screen. "
-        "Your task is to click on any shape to hear the sound paired with it. "
-        "You can click on multiple shapes as many times as you like."
-        "Press the quit button to quit and continue to the next block.\n\n"
-        "Explore freely and try to remember the pairings.\n\n"
+        "By clicking on any shape, you will hear its matching sound. " \
+        "Your task is to learn these pairings."
+        "You can click on the shapes as many times as you like."
+        "Once you have learned these pairings, please press the quit button to continue to the next block.\n\n"
         "Press SPACEBAR to start."
     )
 
