@@ -292,7 +292,7 @@ def block_two():
         core.wait(1)
         
         # Pick a random incorrect tone
-        available_tones = [f"tone_{i:02d}.wav" for i in range(1, 11) if f"tone_{i:02d}.wav" != audio_file]
+        available_tones = [f"sound_{i:d}.wav" for i in range(1, 11) if f"sound_{i:d}.wav" != audio_file]
         incorrect_tone = random.choice(available_tones)
         
         # Randomly order the two tones
