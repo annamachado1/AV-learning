@@ -6,7 +6,7 @@ import cv2
 import pandas as pd
 from PIL import Image
 
-# Function to generate an irregular polygon with complexity adjustments
+# Function to generate an irregular polygon with complexity adjustments 
 def generate_max_complexity_polygon(num_sides=18, distortion=0.7, concavity=0.8, jaggedness=0.8, scale=0.75):
     """Generate a highly complex irregular polygon within a safe region (with padding)."""
     angles = np.sort(np.random.rand(num_sides) * 2 * np.pi)
