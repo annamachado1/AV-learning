@@ -11,7 +11,7 @@ prefs.general['audioDevice'] = ['default']
 
 # Set the path where images and sounds are stored
 image_dir = "./generated_shapes"
-audio_dir = "./generated_tones"
+audio_dir = "./generated_sounds"
 
 # Store participant data
 participant_data = {
