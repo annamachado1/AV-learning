@@ -80,6 +80,21 @@ def save_max_complexity_shapes(num_shapes=10, seed_value=42, scale=0.75):
 
         # Compute RMS contrast
         contrast = compute_rms_contrast(filename)
+        
+        # Iteratively adjust contrast until it falls within the desired range [115, 125]
+        desired_contrast = 120  # midpoint of desired range
+        max_iterations = 20  # increased further to help ensure proper adjustment
+        iterations = 0
+        while (contrast < 115 or contrast > 125) and iterations < max_iterations:
+            img = cv2.imread(filename, cv2.IMREAD_GRAYSCALE)
+            mean_intensity = np.mean(img)  # use the image's current mean
+            alpha = desired_contrast / contrast
+            adjusted = np.clip((img - mean_intensity) * alpha + mean_intensity, 0, 255).astype(np.uint8)
+            cv2.imwrite(filename, adjusted)
+            contrast = compute_rms_contrast(filename)
+            iterations += 1
+        if iterations == max_iterations and (contrast < 115 or contrast > 125):
+            print(f"Warning: {filename} remains out of desired range after {max_iterations} iterations.")
 
         # Store parameters and contrast
         shape_data.append({
