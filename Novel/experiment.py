@@ -355,15 +355,15 @@ def block_two():
         progress_value += 1.0 / total_trials    
         progress_bar = create_progress_bar(progress_value)
 
-        # Show feedback
-        feedback_img = "green_tick.png" if response == correct_answer else "red_cross.png"
-        feedback_stim = visual.ImageStim(win, image=feedback_img, size=(0.2, 0.3), pos=(0, 0))
+        # # Show feedback
+        # feedback_img = "green_tick.png" if response == correct_answer else "red_cross.png"
+        # feedback_stim = visual.ImageStim(win, image=feedback_img, size=(0.2, 0.3), pos=(0, 0))
         
-        feedback_stim.draw()
-        progress_bg.draw()
-        progress_bar.draw()
-        win.flip()
-        core.wait(1)
+        # feedback_stim.draw()
+        # progress_bg.draw()
+        # progress_bar.draw()
+        # win.flip()
+        # core.wait(1)
         
         
 def save_results():
