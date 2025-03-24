@@ -21,6 +21,7 @@ participant_data = {
     "block 2 correct": 0,
     "block 2 incorrect": 0,
     "reaction time": [],
+    "block 2 log": [],
 }
 
 # Generate ordered list of paired stimuli (each appearing 5 times)
@@ -30,8 +31,8 @@ random.shuffle(all_trials)  # Completely randomize order
 
 # Create a PsychoPy window
 try:
-    win = visual.Window(fullscr=True, color="gray", units="norm", monitor='testMonitor', allowGUI=True)
-    # win = visual.Window(size=[1200, 800], color="gray", units="norm", allowGUI=True, pos=[0, 0])
+    # win = visual.Window(fullscr=True, color="gray", units="norm", monitor='testMonitor', allowGUI=True)
+    win = visual.Window(size=[1200, 800], color="gray", units="norm", allowGUI=True, pos=[0, 0])
 
 except Exception as e:
     print(f"Error creating window: {str(e)}")
@@ -273,6 +274,8 @@ def block_two():
     
     progress_bar = create_progress_bar(progress_value)
     
+    participant_data["block2_log"] = []
+    
     for trial_index, (img_file, audio_file) in enumerate(stimuli_pairs):
         if "escape" in event.getKeys():
             win.close()
@@ -354,6 +357,18 @@ def block_two():
             
         progress_value += 1.0 / total_trials    
         progress_bar = create_progress_bar(progress_value)
+        
+        trial_data = {
+            "trial_index": trial_index,
+            "stimulus": img_file,
+            "audio": audio_file,
+            "tones_order": tones,  # the randomized order of tone presentation
+            "correct_answer": correct_answer,
+            "response": response,
+            "reaction_time": reaction_time
+        }
+        
+        participant_data["block2_log"].append(trial_data)
 
         # # Show feedback
         # feedback_img = "green_tick.png" if response == correct_answer else "red_cross.png"
@@ -381,6 +396,12 @@ def save_results():
         
         for img, data in participant_data["click data"].items():
             writer.writerow([img, data["clicks"]])
+            
+        writer.writerow([])  # Separation
+        writer.writerow(["Block 2 Log: Trial Index", "Stimulus", "Audio", "Tone Order", "Correct Answer", "Response", "Reaction Time"])
+        for trial in participant_data["block2_log"]:
+            writer.writerow([trial["trial_index"], trial["stimulus"], trial["audio"],
+                             ", ".join(trial["tones_order"]), trial["correct_answer"], trial["response"], trial["reaction_time"]])
 
 
 # Run Experiment
