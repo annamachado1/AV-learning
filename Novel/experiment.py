@@ -214,25 +214,18 @@ def block_one_active():
     # End timing
     participant_data["time on active task"] = round(time.time() - start_time, 2)  # Store time spent
     return "done"
-    
 
-# Second block: Matching task with timing & feedback
-def block_two():
+def block_two_subtrial():
+    trials = stimuli_pairs * 10
+    random.shuffle(trials)
+    return trials
+
+def block_two_subblock(subblock, trials):
     global participant_data
     
-    instructions_text = (
-        "Instructions: \n\n"
-        "In this part of the experiment, you will see a shape and hear two tones played one after the other. "
-        "Your task is to match the shape with the correct sound.\n\n"
-        "If the first tone matches the shape, press '1'. If the second tone matches the shape, press '2'.\n\n"
-        "Please respond as quickly as possible. If no response is given within 5 seconds, the next trial will start automatically.\n\n"
-        "Press SPACEBAR to continue."
-    )
-    show_instructions(instructions_text, ["space"])
-    
-    total_trials = len(stimuli_pairs)  # Total number of trials
+    total_trials = len(trials)  # should be 100
     progress_value = 0.0
-
+    
     bar_width = 0.5
     bar_height = 0.07
     bar_y = -0.7
@@ -243,12 +236,10 @@ def block_two():
     
     progress_bg = visual.ShapeStim(
         win,
-        vertices=[
-            (left_edge, y1_bg),
-            (left_edge+bar_width, y1_bg),
-            (left_edge+bar_width, y2_bg),
-            (left_edge, y2_bg)
-        ],
+        vertices=[(left_edge, y1_bg),
+                  (left_edge+bar_width, y1_bg),
+                  (left_edge+bar_width, y2_bg),
+                  (left_edge, y2_bg)],
         fillColor='darkgrey',
         lineColor='white',
         closeShape=True
@@ -274,15 +265,13 @@ def block_two():
     
     progress_bar = create_progress_bar(progress_value)
     
-    participant_data["block2_log"] = []
-    
-    for trial_index, (img_file, audio_file) in enumerate(stimuli_pairs):
+    for trial_index, (img_file, audio_file) in enumerate(trials):
         if "escape" in event.getKeys():
             win.close()
             core.quit()
-        
+            
         image_path = os.path.join(image_dir, img_file)
-        img_stim = visual.ImageStim(win, image=image_path, size=(0.3, 0.4), pos=(0, 0))  # Smaller shape display
+        img_stim = visual.ImageStim(win, image=image_path, size=(0.3, 0.4), pos=(0, 0))
         
         # Start timing the trial
         trial_clock = core.Clock()
@@ -301,22 +290,22 @@ def block_two():
         # Randomly order the two tones
         tones = [audio_file, incorrect_tone]
         random.shuffle(tones)
-
+        
         # Play first tone
         tone1 = sound.Sound(os.path.join(audio_dir, tones[0]), secs=1.0)
         tone1.play()
         core.wait(1)
         tone1.stop()
-
+        
         # Pause before second tone
         core.wait(0.5)
-
+        
         # Play second tone
         tone2 = sound.Sound(os.path.join(audio_dir, tones[1]), secs=1.0)
         tone2.play()
         core.wait(1)
         tone2.stop()
-
+        
         # Show response prompt
         response_prompt = visual.TextStim(
             win,
@@ -329,7 +318,7 @@ def block_two():
         progress_bg.draw()
         progress_bar.draw()
         win.flip()
-
+        
         # Start reaction time tracking
         trial_clock.reset()
         # Wait for response but limit total trial duration to 5 seconds
@@ -342,7 +331,6 @@ def block_two():
             elif keys:
                 response = keys[0]
                 break
-
             
         reaction_time = round(trial_clock.getTime(), 3)
         participant_data["reaction time"].append(reaction_time)
@@ -350,36 +338,69 @@ def block_two():
         correct_answer = "1" if tones[0] == audio_file else "2"
         if response == correct_answer:
             participant_data["block 2 correct"] += 1
-            # progress_value += 1.0 / total_trials
         else:
             participant_data["block 2 incorrect"] += 1
-            # progress_value = max(0, progress_value - (1.0 / total_trials))
             
-        progress_value += 1.0 / total_trials    
+        progress_value += 1.0 / total_trials
         progress_bar = create_progress_bar(progress_value)
         
         trial_data = {
+            "subblock": subblock,
             "trial_index": trial_index,
             "stimulus": img_file,
             "audio": audio_file,
-            "tones_order": tones,  # the randomized order of tone presentation
+            "tones_order": tones,  # randomized tone order
             "correct_answer": correct_answer,
             "response": response,
             "reaction_time": reaction_time
         }
-        
-        participant_data["block2_log"].append(trial_data)
+        participant_data["block 2 log"].append(trial_data)
 
-        # # Show feedback
-        # feedback_img = "green_tick.png" if response == correct_answer else "red_cross.png"
-        # feedback_stim = visual.ImageStim(win, image=feedback_img, size=(0.2, 0.3), pos=(0, 0))
-        
-        # feedback_stim.draw()
-        # progress_bg.draw()
-        # progress_bar.draw()
-        # win.flip()
-        # core.wait(1)
-        
+def block_two_break():
+    break_message = visual.TextStim(
+        win,
+        text="Take a short break.\n\nNext part will begin in 30 seconds.",
+        color="white",
+        height=0.06,
+        pos=(0, 0)
+    )
+    
+    break_message.draw()
+    win.flip()
+    core.wait(30)  # 30 seconds break
+    
+    continue_message = visual.TextStim(
+        win,
+        text="Break over. Press SPACEBAR to continue.",
+        color="white",
+        height=0.06,
+        pos=(0, 0)
+    )
+    
+    continue_message.draw()
+    win.flip()
+    event.waitKeys(keyList=["space"])  # Wait for spacebar to continue
+    
+    
+
+# Second block: Matching task with timing & feedback
+def block_two():
+    instructions_text = (
+        "Instructions: \n\n"
+        "In this part of the experiment, you will see a shape and hear two tones played one after the other. "
+        "Your task is to match the shape with the correct sound.\n\n"
+        "If the first tone matches the shape, press '1'. If the second tone matches the shape, press '2'.\n\n"
+        "Please respond as quickly as possible. If no response is given within 5 seconds, the next trial will start automatically.\n\n"
+        "Press SPACEBAR to continue."
+    )
+    show_instructions(instructions_text, ["space"])
+    
+    num_subblocks = 3
+    for subblock in range(1, num_subblocks + 1):
+        trials = block_two_subtrial()
+        block_two_subblock(subblock, trials)
+        if subblock < num_subblocks:
+            block_two_break()
         
 def save_results():
     filename = f"participant_data_{time.strftime('%Y%m%d-%H%M%S')}.csv"
@@ -399,7 +420,7 @@ def save_results():
             
         writer.writerow([])  # Separation
         writer.writerow(["Block 2 Log: Trial Index", "Stimulus", "Audio", "Tone Order", "Correct Answer", "Response", "Reaction Time"])
-        for trial in participant_data["block2_log"]:
+        for trial in participant_data["block 2 log"]:
             writer.writerow([trial["trial_index"], trial["stimulus"], trial["audio"],
                              ", ".join(trial["tones_order"]), trial["correct_answer"], trial["response"], trial["reaction_time"]])
 
