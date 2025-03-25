@@ -10,7 +10,7 @@ prefs.hardware['audioLib'] = ['sounddevice', 'pygame']
 prefs.general['audioDevice'] = ['default']
 
 # Set the path where images and sounds are stored
-image_dir = "./generated_shapes"
+image_dir = "./generated_shapes_grayscaled"
 audio_dir = "./generated_sounds"
 
 # Store participant data
