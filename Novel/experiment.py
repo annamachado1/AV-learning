@@ -39,7 +39,7 @@ except Exception as e:
     core.quit()
 
 def show_instructions(text, continue_keys=["1", "2", "space"]):
-    instructions = visual.TextStim(win, text=text, color="white", height=0.06, pos=(0, 0))
+    instructions = visual.TextStim(win, text=text, color="lightgrey", height=0.06, pos=(0, 0))
     instructions.draw()
     win.flip()
     
@@ -81,7 +81,7 @@ def block_one_passive():
 
     show_instructions(instructions_text, ["space"])
 
-    fixation = visual.TextStim(win, text="+", color="white", height=0.1, pos=(0, 0))
+    fixation = visual.TextStim(win, text="+", color="lightgrey", height=0.1, pos=(0, 0))
     for img_file, audio_file in all_trials:
         if "escape" in event.getKeys():
             win.close()
@@ -149,7 +149,7 @@ def block_one_active():
             participant_data["click data"][img_file] = {"clicks": 0}
 
     # Create a timer display
-    timer_display = visual.TextStim(win, text="Time Left: 10:00", color="white", pos=(0, 0.75), height=0.07)
+    timer_display = visual.TextStim(win, text="Time Left: 10:00", color="lightgrey", pos=(0, 0.75), height=0.07)
     
     quit_button_vertices = [
         (-0.1, -0.05), (0.1, -0.05),
@@ -159,7 +159,7 @@ def block_one_active():
     quit_button = visual.ShapeStim(
         win,
         vertices=quit_button_vertices,
-        fillColor="white",
+        fillColor="lightgrey",
         pos=(0.75, 0.75),
         closeShape=True
     )
@@ -310,7 +310,7 @@ def block_two_subblock(subblock, trials):
         response_prompt = visual.TextStim(
             win,
             text="Press 1 if the first tone matches.\nPress 2 if the second tone matches.",
-            color="white",
+            color="lightgrey",
             height=0.05,
             pos=(0, 0)
         )
@@ -360,7 +360,7 @@ def block_two_break():
     break_message = visual.TextStim(
         win,
         text="Take a short break.\n\nNext part will begin in 30 seconds.",
-        color="white",
+        color="lightgrey",
         height=0.06,
         pos=(0, 0)
     )
@@ -372,7 +372,7 @@ def block_two_break():
     continue_message = visual.TextStim(
         win,
         text="Break over. Press SPACEBAR to continue.",
-        color="white",
+        color="lightgrey",
         height=0.06,
         pos=(0, 0)
     )
