@@ -234,64 +234,134 @@ def block_one_active():
     feedback_duration = 1.0
 
     for trial_index, (img_file, audio_file) in enumerate(active_trials):
-        keys = event.getKeys()
-        if "escape" in keys:
+        if "escape" in event.getKeys():
             win.close()
             core.quit()
 
-        image_path = os.path.join(image_dir, img_file)
-        img_stim = visual.ImageStim(win, image=image_path, size=(0.3, 0.4), pos=(0, 0))
-        img_stim.draw()
-        win.flip()
-        core.wait(1.0)
-
-        available_tones = [f"sound_{i}.wav" for i in range(1, 11) if f"sound_{i}.wav" != audio_file]
-        incorrect_tone = random.choice(available_tones)
-        tones = [audio_file, incorrect_tone]
-        random.shuffle(tones)
-
-        tone1 = sound.Sound(os.path.join(audio_dir, tones[0]), secs=1.0)
-        tone2 = sound.Sound(os.path.join(audio_dir, tones[1]), secs=1.0)
-        tone1.play()
-        core.wait(1)
-        tone1.stop()
-        core.wait(0.5)
-        tone2.play()
-        core.wait(1)
-        tone2.stop()
-
-        prompt = visual.TextStim(win, text="Press 1 if first tone matches.\nPress 2 if second tone matches.", color="white", height=0.05)
-        prompt.draw()
-        win.flip()
-
-        event.clearEvents()
         trial_clock = core.Clock()
-        response = None
-        while trial_clock.getTime() < 5:
-            keys = event.getKeys(["1", "2", "escape"])
-            if "escape" in keys:
-                win.close()
-                core.quit()
-            elif keys:
-                response = keys[0]
-                break
+        # Randomly choose a trial type.
+        trial_type = random.choice(["image+tone", "audio+image"])
+        
+        if trial_type == "audio+image":
+            win.flip()
+            event.clearEvents()
+            core.wait(0.7)
 
-        correct_answer = "1" if tones[0] == audio_file else "2"
-        feedback_img = visual.ImageStim(win, image="green_tick.png" if response == correct_answer else "red_cross.png", size=(0.2, 0.3))
+        if trial_type == "image+tone":
+            image_path = os.path.join(image_dir, img_file)
+            img_stim = visual.ImageStim(win, image=image_path, size=(0.3, 0.4), pos=(0, 0))
+            img_stim.draw()
+            win.flip()
+            core.wait(1.0)
+            
+            available_tones = [f"sound_{i}.wav" for i in range(1, 11) if f"sound_{i}.wav" != audio_file]
+            incorrect_tone = random.choice(available_tones)
+            tones = [audio_file, incorrect_tone]
+            random.shuffle(tones)
+            
+            tone1 = sound.Sound(os.path.join(audio_dir, tones[0]), secs=1.0)
+            tone1.play()
+            core.wait(1)
+            tone1.stop()
+            core.wait(0.5)
+            tone2 = sound.Sound(os.path.join(audio_dir, tones[1]), secs=1.0)
+            tone2.play()
+            core.wait(1)
+            tone2.stop()
+            
+            prompt = visual.TextStim(
+                win,
+                text="Press 1 if the FIRST tone matches.\nPress 2 if the SECOND tone matches.",
+                color="white", height=0.05, pos=(0, 0)
+            )
+            prompt.draw()
+            win.flip()
+            
+            event.clearEvents()
+            response = None
+            while trial_clock.getTime() < 5:
+                keys = event.getKeys(keyList=["1", "2", "escape"])
+                if "escape" in keys:
+                    win.close()
+                    core.quit()
+                elif keys:
+                    response = keys[0]
+                    event.clearEvents()
+                    break
+            
+            reaction_time = round(trial_clock.getTime(), 3)
+            correct_answer = "1" if tones[0] == audio_file else "2"
+            
+
+        else:
+            tone = sound.Sound(os.path.join(audio_dir, audio_file), secs=1.0)
+            tone.play()
+            available_images = [pair[0] for pair in stimuli_pairs if pair[0] != img_file]
+            distractor_image = random.choice(available_images)
+            images = [img_file, distractor_image]
+            random.shuffle(images)
+            
+            left_pos = (-0.3, 0)
+            right_pos = (0.3, 0)
+            img_stim_left = visual.ImageStim(win, image=os.path.join(image_dir, images[0]), size=(0.3, 0.4), pos=left_pos)
+            img_stim_right = visual.ImageStim(win, image=os.path.join(image_dir, images[1]), size=(0.3, 0.4), pos=right_pos)
+            
+            img_stim_left.draw()
+            win.flip()
+            core.wait(1.5)
+            
+            img_stim_right.draw()
+            win.flip()
+            core.wait(1.5)
+            tone.stop()
+            
+            prompt = visual.TextStim(
+                win,
+                text="Press 1 if the LEFT image matches the audio.\nPress 2 if the RIGHT image matches.",
+                color="white", height=0.05, pos=(0, 0)
+            )
+            prompt.draw()
+            win.flip()
+            
+            event.clearEvents()
+            trial_clock.reset()
+            response = None
+            while trial_clock.getTime() < 5:
+                keys = event.getKeys(keyList=["1", "2", "escape"])
+                if "escape" in keys:
+                    win.close()
+                    core.quit()
+                elif keys:
+                    response = keys[0]
+                    event.clearEvents()
+                    break
+            
+            reaction_time = round(trial_clock.getTime(), 3)
+            if images[0] == img_file:
+                correct_answer = "1"
+            else:
+                correct_answer = "2"
+        
+        feedback_img = visual.ImageStim(
+            win,
+            image="green_tick.png" if response == correct_answer else "red_cross.png",
+            size=(0.2, 0.3)
+        )
         feedback_img.draw()
         win.flip()
         core.wait(feedback_duration)
-
+        
+        # Log trial details.
         participant_data["block2_log"].append({
             "trial_index": trial_index,
+            "trial_type": trial_type,
             "stimulus": img_file,
             "audio": audio_file,
-            "tones_order": tones,
+            "tones_order": tones if trial_type=="image+tone" else "N/A",
             "correct_answer": correct_answer,
             "response": response,
-            "reaction_time": round(trial_clock.getTime(), 3)
+            "reaction_time": reaction_time
         })
-
     return "done"
 
 def block_two_subtrial():
@@ -413,8 +483,6 @@ def block_two_subblock(subblock, trials):
         else:
             tone = sound.Sound(os.path.join(audio_dir, audio_file), secs=1.0)
             tone.play()
-            core.wait(1)
-            tone.stop()
             core.wait(0.5)
             
             available_images = [pair[0] for pair in stimuli_pairs if pair[0] != img_file]
@@ -440,6 +508,7 @@ def block_two_subblock(subblock, trials):
             progress_bar.draw()
             win.flip()
             core.wait(1.5)
+            tone.stop()
             
             response_prompt = visual.TextStim(
                 win,
