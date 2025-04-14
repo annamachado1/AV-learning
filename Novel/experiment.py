@@ -633,15 +633,18 @@ participant_data["participant_id"] = participant_id
 
 choice = main_menu()
 if choice == "passive":
-    block_one_passive()
+    result = block_one_passive()
+elif choice == "active":
+    result = block_one_active()
 else:
-    block_one_active()
-
-show_instructions("Second Block: Matching Task.\n\n"
+    result = None
+    
+if result == "done":
+    show_instructions("Second Block: Matching Task.\n\n"
                       "Press SPACEBAR to continue.", ["space"])
-block_two()
-
-save_results()
+    block_two()
+    save_results()
+    show_instructions("Thank you for participating!\n\nPress SPACEBAR to exit.", ["space"])
 
 # Cleanup
 win.close()
