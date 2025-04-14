@@ -1,16 +1,19 @@
 import os
 import random
+import pandas as pd
 import csv
 import time
-from psychopy import visual, core, event, sound, prefs, gui=
+from psychopy import visual, core, event, sound, prefs, gui
 
 # Configure sound preferences
 prefs.hardware['audioLib'] = ['sounddevice', 'pygame']
 prefs.general['audioDevice'] = ['default']
 
-image_dir = "./generated_shapes"
+# Set the path where images and sounds are stored
+image_dir = "./generated_shapes_grayscaled"
 audio_dir = "./generated_sounds"
 
+# Store participant data
 participant_data = {
     "task order": "",
     "time on active task": 0,
@@ -18,68 +21,91 @@ participant_data = {
     "block 2 correct": 0,
     "block 2 incorrect": 0,
     "reaction time": [],
-    "block2_log": [],
+    "block 2 log": [],
 }
 
+# Generate ordered list of paired stimuli (each appearing 5 times)
 stimuli_pairs = [(f"shape_{i:02d}.png", f"sound_{i:01d}.wav") for i in range(1, 11)]
 stimuli_pairs = random.sample(stimuli_pairs, 7)
-all_trials = stimuli_pairs * 10  # Each pair appears 5 times
+all_trials = stimuli_pairs * 10  # Each pair appears 10 times
 random.shuffle(all_trials)  # Completely randomize order
 
+try:
+    # win = visual.Window(fullscr=True, color="gray", units="norm", monitor='testMonitor', allowGUI=True)
+    win = visual.Window(size=[1200, 800], color="gray", units="norm", allowGUI=True, pos=[0, 0])
 
-win = visual.Window(size=[1200, 800], color="gray", units="norm", allowGUI=True, pos=[0, 0])
+except Exception as e:
+    print(f"Error creating window: {str(e)}")
+    core.quit()
 
 def show_instructions(text, continue_keys=["1", "2", "space"]):
-    instructions = visual.TextStim(win, text=text, color="white", height=0.06, pos=(0, 0))
+    instructions = visual.TextStim(win, text=text, color="lightgrey", height=0.06, pos=(0, 0))
     instructions.draw()
     win.flip()
+    
     while True:
         keys = event.waitKeys(keyList=continue_keys + ["escape"])
         if "escape" in keys:
             win.close()
             core.quit()
         elif "1" in keys:
-            return "passive"
+            return "passive"  # User selected Passive test
         elif "2" in keys:
-            return "active"
+            return "active"  # User selected Active test
         elif "space" in keys:
             return "continue"
 
+# Main menu
 def main_menu():
-    return show_instructions(
-        "Welcome to the experiment!\n\nPress 1 for Passive Test\nPress 2 for Active Test\n\nPress ESC to quit.",
-        ["1", "2"]
+    instructions_text = (
+        "Welcome to the experiment!\n\n"
+        "Press 1 for Passive Test\n"
+        "Press 2 for Active Test\n\n"
+        "Press ESC to quit."
+    )
+    
+    return show_instructions(instructions_text, ["1", "2"])
+
+# First block: Passive viewing of shapes and sounds
+def block_one_passive():
+    instructions_text = (
+        "Instructions: \n\n"
+        "In this part of the experiment, you will see shapes on the screen paired with sounds. "
+        "Your task is to pay close attention to the sound that corresponds to each shape."
+        "There is no need to respond during this block.\n\n"
+        "Press SPACEBAR to begin when you are ready."
     )
 
-def block_one_passive():
-    show_instructions("In this block, you will be presented with shapes that are paired with sounds. Your task is to observe and listen carefully to memorize these pairings. No response is required. \n\nPress SPACEBAR to begin.", ["space"])
-    event.clearEvents()
+    show_instructions(instructions_text, ["space"])
 
-    fixation = visual.TextStim(win, text="+", color="white", height=0.1, pos=(0, 0))
+    fixation = visual.TextStim(win, text="+", color="lightgrey", height=0.1, pos=(0, 0))
     for img_file, audio_file in all_trials:
-        keys = event.getKeys()
-        if "escape" in keys:
+        if "escape" in event.getKeys():
             win.close()
             core.quit()
 
         fixation.draw()
         win.flip()
-        core.wait(0.5)
+        core.wait(0.5)  # Fixation cross appears for 500ms
 
-        img_stim = visual.ImageStim(win, image=os.path.join(image_dir, img_file), size=(0.25, 0.35), pos=(0, 0))
+        image_path = os.path.join(image_dir, img_file)
         audio_path = os.path.join(audio_dir, audio_file)
-        img_stim.draw()
-        win.flip()
-        try:
-            sound_stim = sound.Sound(audio_path, secs=1)
-            sound_stim.play()
-            core.wait(1)
-            sound_stim.stop()
-        except Exception as e:
-            print(f"Error: {e}")
-            core.wait(1)
+        if os.path.exists(image_path) and os.path.exists(audio_path):
+            img_stim = visual.ImageStim(win, image=image_path, size=(0.25, 0.35), pos=(0,0))  # Set smaller display size
+            try:
+                sound_stim = sound.Sound(audio_path, secs=1, stereo=True, hamming=True)
+                img_stim.draw()
+                win.flip()
+                sound_stim.play()
+                core.wait(1)
+                sound_stim.stop()
+            except Exception as e:
+                print(f"Error playing sound {audio_file}: {str(e)}")
+                img_stim.draw()
+                win.flip()
+                core.wait(1)  # Default duration (1s) if sound fails
 
-    return "done"
+    return 'done'
 
 # # First block: Active viewing of shapes and sounds
 # def block_one_active():
@@ -242,7 +268,6 @@ def block_one_active():
         trial_clock = core.Clock()
         response = None
         while trial_clock.getTime() < 5:
-
             keys = event.getKeys(["1", "2", "escape"])
             if "escape" in keys:
                 win.close()
@@ -277,7 +302,7 @@ def block_two_subtrial():
 def block_two_subblock(subblock, trials):
     global participant_data
     
-    total_trials = len(trials)  # should be 100
+    total_trials = len(trials) 
     progress_value = 0.0
     
     bar_width = 0.5
@@ -410,14 +435,12 @@ def block_two_subblock(subblock, trials):
             win.flip()
             core.wait(1.5)
             
-            # Then show right image for 1 second.
             img_stim_right.draw()
             progress_bg.draw()
             progress_bar.draw()
             win.flip()
             core.wait(1.5)
             
-            # Now, display a separate response prompt page.
             response_prompt = visual.TextStim(
                 win,
                 text="Press 1 if the LEFT image matches the audio.\nPress 2 if the RIGHT image matches.",
@@ -468,8 +491,30 @@ def block_two_subblock(subblock, trials):
         }
         participant_data["block 2 log"].append(trial_data)
 
-
-    return "done"
+def block_two_break():
+    break_message = visual.TextStim(
+        win,
+        text="Take a short break.\n\nNext part will begin in 30 seconds.",
+        color="lightgrey",
+        height=0.06,
+        pos=(0, 0)
+    )
+    
+    break_message.draw()
+    win.flip()
+    core.wait(30)  # 30 seconds break
+    
+    continue_message = visual.TextStim(
+        win,
+        text="Break over. Press SPACEBAR to continue.",
+        color="lightgrey",
+        height=0.06,
+        pos=(0, 0)
+    )
+    
+    continue_message.draw()
+    win.flip()
+    event.waitKeys(keyList=["space"])  # Wait for spacebar to continue
 
 # Second block: Matching task with timing & feedback
 def block_two():
@@ -491,28 +536,6 @@ def block_two():
         block_two_subblock(subblock, trials)
         if subblock < num_subblocks:
             block_two_break()
-        
-# def save_results():
-#     filename = f"participant_data_{time.strftime('%Y%m%d-%H%M%S')}.csv"
-    
-#     with open(filename, mode="w", newline="") as file:
-#         writer = csv.writer(file)
-#         writer.writerow(["Task Order", "Time on Active Task (s)", "Block 2 Correct", "Block 2 Incorrect", "Reaction Times"])
-#         writer.writerow([participant_data["task order"], participant_data["time on active task"], 
-#                          participant_data["block 2 correct"], participant_data["block 2 incorrect"], participant_data["reaction time"]])
-        
-#         writer.writerow([])  # Separation
-#         writer.writerow(["Image Click Data"])
-#         writer.writerow(["Image", "Clicks"])
-        
-#         for img, data in participant_data["click data"].items():
-#             writer.writerow([img, data["clicks"]])
-            
-#         writer.writerow([])  # Separation
-#         writer.writerow(["Block 2 Log: Trial Index", "Stimulus", "Audio", "Tone Order", "Correct Answer", "Response", "Reaction Time"])
-#         for trial in participant_data["block 2 log"]:
-#             writer.writerow([trial["trial_index"], trial["stimulus"], trial["audio"],
-#                              ", ".join(trial["tones_order"]), trial["correct_answer"], trial["response"], trial["reaction_time"]])
             
 def save_results():
     p_id = participant_data["participant_id"]
@@ -595,15 +618,3 @@ if result == "done":
 # Cleanup
 win.close()
 core.quit()
-
-def save_results():
-    # Create folder for participant data if it doesn't exist
-    data_dir = os.path.join(os.getcwd(), "participant_data")
-    if not os.path.exists(data_dir):
-        os.makedirs(data_dir)
-    filename = os.path.join(data_dir, f"results_{participant_data.get('participant_id', 'unknown')}.csv")
-    with open(filename, 'w', newline='') as csvfile:
-        fieldnames = list(participant_data.keys())
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerow(participant_data)
