@@ -1,16 +1,18 @@
 import os
 import random
+random.seed(42)  # Added fixed seed for consistent random pairings
 import pandas as pd
 import csv
 import time
 from psychopy import visual, core, event, sound, prefs, gui
+import numpy as np
 
 # Configure sound preferences
 prefs.hardware['audioLib'] = ['sounddevice', 'pygame']
 prefs.general['audioDevice'] = ['default']
 
 # Set the path where images and sounds are stored
-image_dir = "./generated_shapes_grayscaled"
+image_dir = "./generated_shapes"
 audio_dir = "./generated_sounds"
 
 # Store participant data
@@ -30,9 +32,19 @@ stimuli_pairs = random.sample(stimuli_pairs, 7)
 all_trials = stimuli_pairs * 10  # Each pair appears 10 times
 random.shuffle(all_trials)  # Completely randomize order
 
+def get_participant_id():
+    info = {"Participant ID": ""}
+    dlg = gui.DlgFromDict(info, title="Participant Info")  # new function to prompt for ID
+    if not dlg.OK:
+        core.quit()
+    return info["Participant ID"]
+
+# === Main experiment flow ===
+participant_id = get_participant_id()  # new: get participant id at start
+participant_data["participant_id"] = participant_id
+
 try:
-    # win = visual.Window(fullscr=True, color="gray", units="norm", monitor='testMonitor', allowGUI=True)
-    win = visual.Window(size=[1200, 800], color="gray", units="norm", allowGUI=True, pos=[0, 0])
+    win = visual.Window(fullscr=True, color="gray", units="norm", allowGUI=True)
 
 except Exception as e:
     print(f"Error creating window: {str(e)}")
@@ -54,44 +66,134 @@ def show_instructions(text, continue_keys=["1", "2", "space"]):
             return "active"  # User selected Active test
         elif "space" in keys:
             return "continue"
+        
+def block_zero_pairing():
+    global participant_data
+    participant_data["free_pairings"] = []
 
-# Main menu
-def main_menu():
-    instructions_text = (
-        "Welcome to the experiment!\n\n"
-        "Press 1 for Passive Test\n"
-        "Press 2 for Active Test\n\n"
-        "Press ESC to quit."
-    )
+    # Load shapes and tones
+    shape_files = sorted([f for f in os.listdir(image_dir) if f.startswith("shape_") and f.endswith(".png")])
+    tone_files = sorted([f for f in os.listdir(audio_dir) if f.startswith("sound_") and f.endswith(".wav")])
+
+    random.shuffle(shape_files)
+    random.shuffle(tone_files)
+
+    shape_positions = np.linspace(-0.8, 0.8, 10)
+    tone_positions = np.linspace(-0.8, 0.8, 10)
+
+    shapes = []
+    tones = []
+    tone_sounds = {}
+
+    for i, filename in enumerate(shape_files):
+        stim = visual.ImageStim(win, image=os.path.join(image_dir, filename), pos=(shape_positions[i], 0.5), size=(0.15, 0.25))
+        shapes.append({"stim": stim, "file": filename})
+
+    for i, filename in enumerate(tone_files):
+        stim = visual.ImageStim(win, image="musical_note.png", pos=(tone_positions[i], -0.5), size=(0.1, 0.1))
+        tones.append({"stim": stim, "file": filename})
+        tone_sounds[filename] = sound.Sound(os.path.join(audio_dir, filename))
+
+    # Use a variable to keep track of the currently selected tone (if any)
+    selected_tone = None
+    mouse = event.Mouse(visible=True)
+
+    show_instructions("Click a musical note to hear its sound.\nThen click the shape you wish to pair it with.\n\nPress SPACEBAR when done.", ["space"])
+
+    while True:
+        # Draw all shapes and tones
+        for shape in shapes:
+            shape["stim"].draw()
+        for tone in tones:
+            tone["stim"].draw()
+        win.flip()
+
+        buttons = mouse.getPressed()
+        if buttons[0]:
+            core.wait(0.05)  # small debounce delay
+            # First, check if a tone was clicked
+            tone_clicked = None
+            for tone in tones:
+                if tone["stim"].contains(mouse):
+                    tone_clicked = tone
+                    break
+            if tone_clicked is not None:
+                tone_sounds[tone_clicked["file"]].play()
+                selected_tone = tone_clicked
+            else:
+                # No tone was clicked. If a tone is already selected, check for a shape click.
+                if selected_tone is not None:
+                    for shape in shapes:
+                        if shape["stim"].contains(mouse):
+                            new_pos = (shape["stim"].pos[0], shape["stim"].pos[1] - 0.3)
+                            selected_tone["stim"].pos = new_pos
+                            selected_tone["paired_shape"] = shape["file"]
+                            selected_tone["new_pos"] = new_pos
+                            selected_tone = None
+                            break
+            # Wait until mouse is released to avoid multiple registrations
+            while any(mouse.getPressed()):
+                core.wait(0.01)
+        keys = event.getKeys()
+        if "escape" in keys:
+            win.close()
+            core.quit()
+        elif "space" in keys:
+            break
+
+    # Save pairings based on tones that were paired
+    for tone in tones:
+        if "paired_shape" in tone:
+            participant_data["free_pairings"].append({
+                "tone_file": tone["file"],
+                "shape_file": tone["paired_shape"],
+                "tone_pos": tone["new_pos"],
+                # Find the shape's original position for recording:
+                "shape_pos": next(s["stim"].pos for s in shapes if s["file"] == tone["paired_shape"])
+            })
+
+    print("Pairings recorded:", participant_data["free_pairings"])
     
-    return show_instructions(instructions_text, ["1", "2"])
+    # Save free pairing data to Excel
+    import pandas as pd
+    df = pd.DataFrame(participant_data["free_pairings"])
+    excel_filename = f"{participant_data['participant_id']}_free_pairings.xlsx"
+    df.to_excel(excel_filename, index=False)
+    print(f"Block zero data saved to {excel_filename}")
+    
+    # Clear the screen so that the main menu appears on a separate screen
+    win.clearBuffer()
+    win.flip()
+    
+    return 'done'
 
 # First block: Passive viewing of shapes and sounds
+
 def block_one_passive():
-    instructions_text = (
-        "Instructions: \n\n"
-        "In this part of the experiment, you will see shapes on the screen paired with sounds. "
-        "Your task is to pay close attention to the sound that corresponds to each shape."
-        "There is no need to respond during this block.\n\n"
-        "Press SPACEBAR to begin when you are ready."
-    )
-
+    instructions_text = "You are in the Passive Test.\nPress SPACEBAR to begin viewing the stimuli."
     show_instructions(instructions_text, ["space"])
-
+    # Use free pairings if available; otherwise use default random pairing
+    if participant_data.get("free_pairings"):
+        local_trials = [(pair["shape_file"], pair["tone_file"]) for pair in participant_data["free_pairings"]]
+    else:
+        local_stimuli = list(stimuli_pairs)
+        random.shuffle(local_stimuli)
+        local_trials = local_stimuli
+    local_trials = local_trials * 10
+    random.shuffle(local_trials)
+    
     fixation = visual.TextStim(win, text="+", color="lightgrey", height=0.1, pos=(0, 0))
-    for img_file, audio_file in all_trials:
+    for img_file, audio_file in local_trials:
         if "escape" in event.getKeys():
             win.close()
             core.quit()
-
         fixation.draw()
         win.flip()
         core.wait(0.5)  # Fixation cross appears for 500ms
-
         image_path = os.path.join(image_dir, img_file)
         audio_path = os.path.join(audio_dir, audio_file)
-        if os.path.exists(image_path) and os.path.exists(audio_path):
-            img_stim = visual.ImageStim(win, image=image_path, size=(0.25, 0.35), pos=(0,0))  # Set smaller display size
+        if (os.path.exists(image_path) and os.path.exists(audio_path)):
+            img_stim = visual.ImageStim(win, image=image_path, size=(0.25, 0.35), pos=(0,0))
             try:
                 sound_stim = sound.Sound(audio_path, secs=1, stereo=True, hamming=True)
                 img_stim.draw()
@@ -103,123 +205,17 @@ def block_one_passive():
                 print(f"Error playing sound {audio_file}: {str(e)}")
                 img_stim.draw()
                 win.flip()
-                core.wait(1)  # Default duration (1s) if sound fails
-
+                core.wait(1)
     return 'done'
 
-# # First block: Active viewing of shapes and sounds
-# def block_one_active():
-#     global participant_data
-    
-#     instructions_text = (
-#         "Instructions: \n\n"
-#         "In this part of the experiment, you will see several shapes on the screen. "
-#         "By clicking on any shape, you will hear its matching sound. " \
-#         "Your task is to learn these pairings."
-#         "You can click on the shapes as many times as you like."
-#         "Once you have learned these pairings, please press the quit button to continue to the next block.\n\n"
-#         "Press SPACEBAR to start."
-#     )
-
-#     if show_instructions(instructions_text, ["space"]) != "continue":
-#         return "skip"
-    
-#     participant_data["task order"] = "active"
-    
-#     start_time = time.time()
-        
-#     grid_positions = [
-#         (-0.6,  0.25), (-0.3,  0.25), (0.0,  0.25), (0.3,  0.25), (0.6,  0.25),
-#         (-0.6, -0.25), (-0.3, -0.25), (0.0, -0.25), (0.3, -0.25), (0.6, -0.25)
-#     ]
-#     random.shuffle(grid_positions)
-
-#     stimuli_objects = []
-    
-#     for idx, (img_file, audio_file) in enumerate(stimuli_pairs):
-#         image_path = os.path.join(image_dir, img_file)
-#         audio_path = os.path.join(audio_dir, audio_file)
-#         if os.path.exists(image_path) and os.path.exists(audio_path):
-#             img_stim = visual.ImageStim(win, image=image_path, pos=grid_positions[idx], size=(0.25, 0.35))
-#             sound_stim = sound.Sound(audio_path, secs=1.0, stereo=True, hamming=True)
-#             stimuli_objects.append((img_stim, sound_stim))
-#             participant_data["click data"][img_file] = {"clicks": 0}
-
-#     # Create a timer display
-#     timer_display = visual.TextStim(win, text="Time Left: 10:00", color="lightgrey", pos=(0, 0.75), height=0.07)
-    
-#     quit_button_vertices = [
-#         (-0.1, -0.05), (0.1, -0.05),
-#         (0.1, 0.05),   (-0.1, 0.05)
-#     ]
-
-#     quit_button = visual.ShapeStim(
-#         win,
-#         vertices=quit_button_vertices,
-#         fillColor="lightgrey",
-#         pos=(0.75, 0.75),
-#         closeShape=True
-#     )
-#     quit_text = visual.TextStim(
-#         win,
-#         text="Quit",
-#         color="black",
-#         pos=(0.75, 0.75),
-#         height=0.07
-#     )
-
-#     timer = core.Clock()
-#     max_time = 600  # 10 minutes (600 seconds)
-
-#     while timer.getTime() < max_time:
-#         # Update timer text
-#         time_left = max_time - int(timer.getTime())
-#         minutes, seconds = divmod(time_left, 60)
-#         timer_display.text = f"Time Left: {minutes:02}:{seconds:02}"
-        
-#         # Draw stimuli, timer, and quit button
-#         for img_stim, _ in stimuli_objects:
-#             img_stim.draw()
-#         timer_display.draw()
-#         quit_button.draw()
-#         quit_text.draw()
-        
-#         win.flip()
-
-#         # Check for mouse clicks
-#         mouse = event.Mouse(visible=True)
-#         if mouse.getPressed()[0]:  # Left mouse button clicked
-#             for img_stim, sound_stim in stimuli_objects:
-#                 if img_stim.contains(mouse):
-#                     sound_stim.play()
-#                     core.wait(1.0)
-#                     sound_stim.stop()
-#                     img_file = img_stim.image.split("/")[-1]
-#                     participant_data["click data"][img_file]["clicks"] += 1  # Log clicks
-            
-#             # Check if quit button was clicked
-#             if quit_button.contains(mouse):
-#                 participant_data["time on active task"] = round(time.time() - start_time, 2)
-#                 print("Exiting block one active...")
-#                 return 'done'
-
-#         keys = event.getKeys()
-#         if "escape" in keys:
-#             win.close()
-#             core.quit()
-
-#     # End timing
-#     participant_data["time on active task"] = round(time.time() - start_time, 2)  # Store time spent
-#     return "done"
 
 def block_one_active():
     global participant_data
     participant_data["task order"] = "active"
     participant_data["block2_log"] = []
-
     if show_instructions(
         "In this block, you will see a shape and hear two tones.\n"
-        "Your task is to learn which tone is correctly paired with each shape..\n"
+        "Your task is to learn which tone is correctly paired with the shape.\n"
         "Press '1' if you think the FIRST tone is paired with the shape.\n"
         "Press '2' if you think the SECOND tone is paired with the shape.\n\n"
         "You will receive feedback after each response.\n\n"
@@ -227,142 +223,130 @@ def block_one_active():
         ["space"]
     ) != "continue":
         return "skip"
+    try:
+        event.clearEvents()
+        # Generate a fresh randomized trial list independent of block zero pairings
+        local_stimuli = list(stimuli_pairs)
+        random.shuffle(local_stimuli)
+        active_trials = local_stimuli * 10
+        random.shuffle(active_trials)
+        feedback_duration = 1.0
+        # Removed stray "x" here
 
-    event.clearEvents()
-    active_trials = stimuli_pairs * 10  # changed multiplier from 5 to 10
-    random.shuffle(active_trials)
-    feedback_duration = 1.0
+        for trial_index, (img_file, audio_file) in enumerate(active_trials):
+            if "escape" in event.getKeys():
+                win.close()
+                core.quit()
+            trial_clock = core.Clock()
+            trial_type = random.choice(["audio+image", "image+tone"])
+            
+            if trial_type == "audio+image":
+                # Audio+Image branch:
+                tone = sound.Sound(os.path.join(audio_dir, audio_file), secs=1.0)
+                tone.play()
+                available_images = [pair[0] for pair in stimuli_pairs if pair[0] != img_file]
+                distractor = random.choice(available_images)
+                images = [img_file, distractor]
+                random.shuffle(images)
+                left_pos = (-0.3, 0)
+                right_pos = (0.3, 0)
+                imgL = visual.ImageStim(win, image=os.path.join(image_dir, images[0]),
+                                        size=(0.3, 0.4), pos=left_pos)
+                imgR = visual.ImageStim(win, image=os.path.join(image_dir, images[1]),
+                                        size=(0.3, 0.4), pos=right_pos)
+                imgL.draw()
+                win.flip()
+                core.wait(1.5)
+                imgR.draw()
+                win.flip()
+                core.wait(1.5)
+                tone.stop()
+                prompt = visual.TextStim(win, text="Press 1 if LEFT image matches; 2 if RIGHT image matches.",
+                                         color="white", height=0.05, pos=(0,0))
+                prompt.draw()
+                win.flip()
+                event.clearEvents()
+                trial_clock.reset()
+                response = None
+                while trial_clock.getTime() < 5:
+                    keys = event.waitKeys(keyList=["1", "2", "escape"])
+                    if "escape" in keys:
+                        win.close()
+                        core.quit()
+                    elif keys:
+                        response = keys[0]
+                        break
+                if response is None:
+                    response = "NA"
+                reaction_time = round(trial_clock.getTime(), 3)
+                if images[0] == img_file:
+                    correct_answer = "1"
+                else:
+                    correct_answer = "2"
+            
+            elif trial_type == "image+tone":
+                # Image+Tone branch:
+                image_path = os.path.join(image_dir, img_file)
+                img_stim = visual.ImageStim(win, image=image_path, size=(0.3, 0.4), pos=(0, 0))
+                img_stim.draw()
+                win.flip()
+                core.wait(1.0)
+                available_tones = [f"sound_{i}.wav" for i in range(1, 11) if f"sound_{i}.wav" != audio_file]
+                incorrect_tone = random.choice(available_tones)
+                tones = [audio_file, incorrect_tone]
+                random.shuffle(tones)
+                tone1 = sound.Sound(os.path.join(audio_dir, tones[0]), secs=1.0)
+                tone1.play()
+                core.wait(1)
+                tone1.stop()
+                core.wait(0.5)
+                tone2 = sound.Sound(os.path.join(audio_dir, tones[1]), secs=1.0)
+                tone2.play()
+                core.wait(1)
+                tone2.stop()
+                prompt = visual.TextStim(win, text="Press 1 if FIRST tone matches; 2 if SECOND tone matches.",
+                                         color="white", height=0.05, pos=(0,0))
+                prompt.draw()
+                win.flip()
+                event.clearEvents()
+                trial_clock.reset()   # Reset clock before response collection
+                response = None
+                while trial_clock.getTime() < 5:
+                    keys = event.waitKeys(keyList=["1", "2", "escape"])
+                    if "escape" in keys:
+                        win.close()
+                        core.quit()
+                    elif keys:
+                        response = keys[0]
+                        break
+                if response is None:
+                    response = "NA"
+                reaction_time = round(trial_clock.getTime(), 3)
+                if tones[0] == audio_file:
+                    correct_answer = "1"
+                else:
+                    correct_answer = "2"
 
-    for trial_index, (img_file, audio_file) in enumerate(active_trials):
-        if "escape" in event.getKeys():
-            win.close()
-            core.quit()
-
-        trial_clock = core.Clock()
-        # Randomly choose a trial type.
-        trial_type = random.choice(["image+tone", "audio+image"])
-        
-        if trial_type == "audio+image":
-            win.flip()
-            event.clearEvents()
-            core.wait(0.7)
-
-        if trial_type == "image+tone":
-            image_path = os.path.join(image_dir, img_file)
-            img_stim = visual.ImageStim(win, image=image_path, size=(0.3, 0.4), pos=(0, 0))
-            img_stim.draw()
-            win.flip()
-            core.wait(1.0)
-            
-            available_tones = [f"sound_{i}.wav" for i in range(1, 11) if f"sound_{i}.wav" != audio_file]
-            incorrect_tone = random.choice(available_tones)
-            tones = [audio_file, incorrect_tone]
-            random.shuffle(tones)
-            
-            tone1 = sound.Sound(os.path.join(audio_dir, tones[0]), secs=1.0)
-            tone1.play()
-            core.wait(1)
-            tone1.stop()
-            core.wait(0.5)
-            tone2 = sound.Sound(os.path.join(audio_dir, tones[1]), secs=1.0)
-            tone2.play()
-            core.wait(1)
-            tone2.stop()
-            
-            prompt = visual.TextStim(
-                win,
-                text="Press 1 if the FIRST tone matches.\nPress 2 if the SECOND tone matches.",
-                color="white", height=0.05, pos=(0, 0)
-            )
-            prompt.draw()
-            win.flip()
-            
-            event.clearEvents()
-            response = None
-            while trial_clock.getTime() < 5:
-                keys = event.getKeys(keyList=["1", "2", "escape"])
-                if "escape" in keys:
-                    win.close()
-                    core.quit()
-                elif keys:
-                    response = keys[0]
-                    event.clearEvents()
-                    break
-            
-            reaction_time = round(trial_clock.getTime(), 3)
-            correct_answer = "1" if tones[0] == audio_file else "2"
-            
-
-        else:
-            tone = sound.Sound(os.path.join(audio_dir, audio_file), secs=1.0)
-            tone.play()
-            available_images = [pair[0] for pair in stimuli_pairs if pair[0] != img_file]
-            distractor_image = random.choice(available_images)
-            images = [img_file, distractor_image]
-            random.shuffle(images)
-            
-            left_pos = (-0.3, 0)
-            right_pos = (0.3, 0)
-            img_stim_left = visual.ImageStim(win, image=os.path.join(image_dir, images[0]), size=(0.3, 0.4), pos=left_pos)
-            img_stim_right = visual.ImageStim(win, image=os.path.join(image_dir, images[1]), size=(0.3, 0.4), pos=right_pos)
-            
-            img_stim_left.draw()
-            win.flip()
-            core.wait(1.5)
-            
-            img_stim_right.draw()
-            win.flip()
-            core.wait(1.5)
-            tone.stop()
-            
-            prompt = visual.TextStim(
-                win,
-                text="Press 1 if the LEFT image matches the audio.\nPress 2 if the RIGHT image matches.",
-                color="white", height=0.05, pos=(0, 0)
-            )
-            prompt.draw()
-            win.flip()
-            
-            event.clearEvents()
-            trial_clock.reset()
-            response = None
-            while trial_clock.getTime() < 5:
-                keys = event.getKeys(keyList=["1", "2", "escape"])
-                if "escape" in keys:
-                    win.close()
-                    core.quit()
-                elif keys:
-                    response = keys[0]
-                    event.clearEvents()
-                    break
-            
-            reaction_time = round(trial_clock.getTime(), 3)
-            if images[0] == img_file:
-                correct_answer = "1"
+            # Log results (unchanged code)
+            participant_data["reaction time"].append(reaction_time)
+            if response == correct_answer:
+                participant_data["block 2 correct"] += 1
             else:
-                correct_answer = "2"
-        
-        feedback_img = visual.ImageStim(
-            win,
-            image="green_tick.png" if response == correct_answer else "red_cross.png",
-            size=(0.2, 0.3)
-        )
-        feedback_img.draw()
-        win.flip()
-        core.wait(feedback_duration)
-        
-        # Log trial details.
-        participant_data["block2_log"].append({
-            "trial_index": trial_index,
-            "trial_type": trial_type,
-            "stimulus": img_file,
-            "audio": audio_file,
-            "tones_order": tones if trial_type=="image+tone" else "N/A",
-            "correct_answer": correct_answer,
-            "response": response,
-            "reaction_time": reaction_time
-        })
-    return "done"
+                participant_data["block 2 incorrect"] += 1
+            participant_data["block2_log"].append({
+                "trial_index": trial_index,
+                "trial_type": trial_type,
+                "stimulus": img_file,
+                "audio": audio_file,
+                "tones_order": tones if trial_type=="image+tone" else "N/A",
+                "correct_answer": correct_answer,
+                "response": response,
+                "reaction_time": reaction_time
+            })
+        return "done"
+    except Exception as e:
+        print("Error during active test:", e)
+        core.quit()
 
 def block_two_subtrial():
     trials = stimuli_pairs * 10
@@ -418,18 +402,19 @@ def block_two_subblock(subblock, trials):
         if "escape" in event.getKeys():
             win.close()
             core.quit()
-            
+        
         trial_clock = core.Clock()
-        
-        # Randomly choose trial type: "image+tone" or "audio+image"
         trial_type = random.choice(["image+tone", "audio+image"])
-        
+
+        tones = None  # Prevent crash if trial_type is audio+image
+
         if trial_type == "audio+image":
             progress_bg.draw()
             progress_bar.draw()
             win.flip()
             event.clearEvents()
             core.wait(0.7)
+
         
         if trial_type == "image+tone":
             image_path = os.path.join(image_dir, img_file)
@@ -590,11 +575,10 @@ def block_two():
     instructions_text = (
         "Instructions: \n\n"
         "In this part, trials will be interleaved.\n"
-        "Sometimes you will see an image followed by two tones (image+tone trials).\n"
-        "Other times, you will hear one tone and then see two images (audio+image trials).\n\n"
+        "You will see an image followed by two tones (image+tone trials).\n"
+        "You will also hear one tone and then see two images (audio+image trials).\n\n"
         "For image+tone trials, press '1' if the FIRST tone is correct, '2' if the SECOND tone is correct.\n"
         "For audio+image trials, press '1' if the LEFT image matches the audio, '2' if the RIGHT image matches.\n\n"
-        "Please respond as quickly as possible. If no response is given within 3 seconds, the next trial will start automatically.\n\n"
         "Press SPACEBAR to continue."
     )
     show_instructions(instructions_text, ["space"])
@@ -633,6 +617,19 @@ def save_results():
         writer.writerow(["Image", "Clicks"])
         for img, data in participant_data["click data"].items():
             writer.writerow([img, data["clicks"]])
+
+    # Save free pairings based on tones that were paired
+    with open(f"{p_id}_free_pairings.csv", "w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["Tone File", "Shape File", "Tone Position", "Shape Position"])
+        for pairing in participant_data["free_pairings"]:
+            writer.writerow([
+                pairing["tone_file"],
+                pairing["shape_file"],
+                pairing["tone_pos"],
+                pairing["shape_pos"]
+                ])
+
     
     # Save detailed block 2 log in another CSV file.
     log_filename = f"{p_id}_block2_log.csv"
@@ -656,16 +653,17 @@ def save_results():
                 trial["reaction_time"]
             ])
 
-def get_participant_id():
-    info = {"Participant ID": ""}
-    dlg = gui.DlgFromDict(info, title="Participant Info")  # new function to prompt for ID
-    if not dlg.OK:
-        core.quit()
-    return info["Participant ID"]
+################### MAIN EXPERIMENTAL FLOW ###################
 
-# === Main experiment flow ===
-participant_id = get_participant_id()  # new: get participant id at start
-participant_data["participant_id"] = participant_id
+block_zero_pairing()
+
+def main_menu():
+    instructions_text = (
+        "Press 1 for Passive Test\n"
+        "Press 2 for Active Test\n\n"
+    )
+    # Allow only keys "1" and "2" here (no space)
+    return show_instructions(instructions_text, ["1", "2"])
 
 choice = main_menu()
 
@@ -675,15 +673,13 @@ elif choice == "active":
     result = block_one_active()
 else:
     result = None
-    
-if result == "done":
-    show_instructions("Second Block: Matching Task.\n\n"
-                      "Press SPACEBAR to continue.", ["space"])
 
+if result == "done":
+    show_instructions("Second Block: Matching Task.\n\nPress SPACEBAR to continue.", ["space"])
     block_two()
     save_results()
     show_instructions("Thank you for participating!\n\nPress SPACEBAR to exit.", ["space"])
-    
+
 # Cleanup
 win.close()
 core.quit()

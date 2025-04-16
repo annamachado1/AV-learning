@@ -1,54 +1,56 @@
 import numpy as np
-import scipy.signal as signal
 import scipy.io.wavfile as wav
 import os
+import pandas as pd
 
-def generate_white_noise(duration=3, fs=10000):  # Changed duration from 0.3 to 3
-    """Generate a segment of white noise."""
-    return np.random.uniform(-1, 1, int(fs * duration))
-
-def instantaneous_frequency_dilation(noise, fs, entropy_levels):
-    """Apply frequency dilation by filtering and resampling noise."""
-    distinct_sounds = []
-    for entropy in entropy_levels:
-        filter_order = max(int(50 / entropy), 5)  # Increased filter order for better distinction
-        cutoff = max(min(int(fs * entropy * 0.8), fs // 2 - 1), 1)  # Adjusted scaling for better spacing
-        b = signal.firwin(filter_order, cutoff / (fs / 2), window='hamming', pass_zero=True)
-        filtered_noise = signal.lfilter(b, 1, noise)
-        resampled_noise = signal.resample(filtered_noise, len(noise))
-        distinct_sounds.append(resampled_noise)
-    return distinct_sounds
-
-def time_dilation(noise, fs, entropy_levels):
-    """Apply time dilation by truncating and resampling noise."""
-    distinct_sounds = []
-    for entropy in entropy_levels:
-        truncated_duration = max(int(len(noise) * entropy * 0.8), 1)  # Adjusted scaling for better distinction
-        truncated_noise = noise[:truncated_duration]
-        resampled_noise = signal.resample(truncated_noise, len(noise))
-        distinct_sounds.append(resampled_noise)
-    return distinct_sounds
-
-def save_wav(filename, data, fs=10000):
-    """Save sound as a WAV file."""
-    wav.write(filename, fs, np.int16(data * 32767))
+def generate_sine_wave(freq, amplitude, duration, fs):
+    """Generate a sine wave at given frequency and amplitude."""
+    t = np.linspace(0, duration, int(fs * duration), endpoint=False)
+    return amplitude * np.sin(2 * np.pi * freq * t)
 
 def main():
-    fs = 10000  # Sampling frequency
+    # Parameters
+    fs = 44100            # Sampling frequency (Hz)
+    duration = 1.0        # Duration in seconds
+    num_tones = 10        # Number of tones to generate
+    freq_start = 100      # Start frequency (Hz)
+    freq_end = 1000       # End frequency (Hz)
+    amp_start = 0.1       # Start amplitude (normalized)
+    amp_end = 0.9         # End amplitude (normalized)
+
+    # Output directory
     output_dir = "generated_sounds"
     os.makedirs(output_dir, exist_ok=True)
-    
-    entropy_levels = np.linspace(0.05, 0.9, 5)  # Increased range for more variation
-    
-    noise = generate_white_noise(fs=fs)
-    fd_sounds = instantaneous_frequency_dilation(noise, fs, entropy_levels)
-    td_sounds = time_dilation(noise, fs, entropy_levels)
-    
-    for i, (fd_sound, td_sound) in enumerate(zip(fd_sounds, td_sounds)):
-        save_wav(os.path.join(output_dir, f"fd_sound_{i+1}.wav"), fd_sound, fs)
-        save_wav(os.path.join(output_dir, f"td_sound_{i+1}.wav"), td_sound, fs)
-    
-    print("Generated 10 distinct novel sounds (5 FD and 5 TD) in the 'generated_sounds' folder.")
+
+    # Linear spacing of frequency and amplitude
+    freqs = np.linspace(freq_start, freq_end, num_tones)
+    amps = np.linspace(amp_start, amp_end, num_tones)
+
+    # Store metadata
+    metadata = []
+
+    for i in range(num_tones):
+        freq = freqs[i]
+        amp = amps[i]
+        tone = generate_sine_wave(freq, amp, duration, fs)
+        tone = np.int16(tone * 32767)  # Convert to 16-bit PCM format
+
+        filename = f"sound_{i+1:02d}.wav"
+        wav_path = os.path.join(output_dir, filename)
+        wav.write(wav_path, fs, tone)
+
+        print(f"Saved {filename} | Frequency: {freq:.1f} Hz | Amplitude: {amp:.2f}")
+        metadata.append({
+            "Sound": i+1,
+            "Frequency_Hz": freq,
+            "Amplitude": amp,
+            "Filename": filename
+        })
+
+    # Save metadata
+    df = pd.DataFrame(metadata)
+    df.to_excel(os.path.join(output_dir, "sound_metadata.xlsx"), index=False)
+    print("\nSaved tone metadata to 'sound_metadata.xlsx'.")
 
 if __name__ == "__main__":
     main()
