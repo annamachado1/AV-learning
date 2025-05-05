@@ -1,0 +1,72 @@
+[
+  {
+    "file": "sound_01.wav",
+    "F0_Hz": 138,
+    "harmonics": 23,
+    "beta_tilt": 3.5,
+    "spectral_centroid_Hz": 139.20668989352754
+  },
+  {
+    "file": "sound_02.wav",
+    "F0_Hz": 155,
+    "harmonics": 21,
+    "beta_tilt": 3.5,
+    "spectral_centroid_Hz": 156.3193995090931
+  },
+  {
+    "file": "sound_03.wav",
+    "F0_Hz": 170,
+    "harmonics": 19,
+    "beta_tilt": 3.5,
+    "spectral_centroid_Hz": 171.49144029301945
+  },
+  {
+    "file": "sound_04.wav",
+    "F0_Hz": 185,
+    "harmonics": 17,
+    "beta_tilt": 3.5,
+    "spectral_centroid_Hz": 186.6314761869458
+  },
+  {
+    "file": "sound_05.wav",
+    "F0_Hz": 207,
+    "harmonics": 15,
+    "beta_tilt": 3.5,
+    "spectral_centroid_Hz": 208.82332021175105
+  },
+  {
+    "file": "sound_06.wav",
+    "F0_Hz": 233,
+    "harmonics": 13,
+    "beta_tilt": 3.5,
+    "spectral_centroid_Hz": 235.0395544353378
+  },
+  {
+    "file": "sound_07.wav",
+    "F0_Hz": 255,
+    "harmonics": 11,
+    "beta_tilt": 3.5,
+    "spectral_centroid_Hz": 257.24407534220927
+  },
+  {
+    "file": "sound_08.wav",
+    "F0_Hz": 275,
+    "harmonics": 9,
+    "beta_tilt": 3.5,
+    "spectral_centroid_Hz": 277.4134059465647
+  },
+  {
+    "file": "sound_09.wav",
+    "F0_Hz": 310,
+    "harmonics": 7,
+    "beta_tilt": 3.5,
+    "spectral_centroid_Hz": 312.7491990225834
+  },
+  {
+    "file": "sound_10.wav",
+    "F0_Hz": 345,
+    "harmonics": 5,
+    "beta_tilt": 3.5,
+    "spectral_centroid_Hz": 348.0643578392671
+  }
+]

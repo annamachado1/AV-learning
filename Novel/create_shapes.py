@@ -1,94 +1,81 @@
+# incremental_shapes_mapper_fixed.py
 import matplotlib.pyplot as plt
 import numpy as np
-import os
-import cv2
-import pandas as pd
-import random
+import os, cv2, pandas as pd
 
-# Function to generate an irregular polygon with complexity parameters
+# ────────── helpers (unchanged) ────────────────────────────────────────────
 def generate_complex_polygon(num_sides, distortion, concavity, jaggedness, scale=0.75):
     angles = np.sort(np.random.rand(num_sides) * 2 * np.pi)
-    radii = 0.5 + np.random.rand(num_sides) * distortion
-    points = [(0.5 + r*np.cos(a), 0.5 + r*np.sin(a)) for r, a in zip(radii, angles)]
+    radii  = 0.5 + np.random.rand(num_sides) * distortion
+    pts    = [(0.5 + r*np.cos(a), 0.5 + r*np.sin(a)) for r, a in zip(radii, angles)]
 
-    num_concave = int(num_sides * concavity)
-    concave_indices = np.random.choice(num_sides, num_concave, replace=False)
-    for i in concave_indices:
-        points[i] = ((points[i][0] + 0.5) / 2, (points[i][1] + 0.5) / 2)
+    # concave vertices
+    n_conc = int(num_sides * concavity)
+    conc_i = np.random.choice(num_sides, n_conc, replace=False)
+    for i in conc_i:
+        pts[i] = ((pts[i][0]+0.5)/2, (pts[i][1]+0.5)/2)
 
-    num_jagged = int(num_sides * jaggedness)
-    jagged_indices = np.random.choice(num_sides, num_jagged, replace=False)
-    for i in jagged_indices:
-        points[i] = (points[i][0] + np.random.uniform(-0.05, 0.05),
-                     points[i][1] + np.random.uniform(-0.05, 0.05))
+    # jagged vertices
+    n_jag  = int(num_sides * jaggedness)
+    jag_i  = np.random.choice(num_sides, n_jag, replace=False)
+    for i in jag_i:
+        pts[i] = (pts[i][0] + np.random.uniform(-0.05, 0.05),
+                  pts[i][1] + np.random.uniform(-0.05, 0.05))
 
-    points = [(0.5 + (x - 0.5) * scale, 0.5 + (y - 0.5) * scale) for x, y in points]
-    return points
+    # global scaling
+    return [(0.5+(x-0.5)*scale, 0.5+(y-0.5)*scale) for x, y in pts]
 
-def compute_rms_contrast(image_path):
-    img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-    mean_intensity = np.mean(img)
-    return np.sqrt(np.mean((img - mean_intensity) ** 2))
+def compute_rms_contrast(png_path):
+    img  = cv2.imread(png_path, cv2.IMREAD_GRAYSCALE)
+    mu   = np.mean(img)
+    return np.sqrt(np.mean((img-mu)**2))
 
-def generate_incremental_shapes(n_shapes=10, output_dir="generated_shapes", scale=0.75):
+# ────────── main generator ─────────────────────────────────────────────────
+def generate_shapes(
+        output_dir     = "generated_shapes",
+        sides_list     = (8, 10, 12, 14, 16, 18, 20, 22, 24, 26), 
+        jagged_list   = (0.15,  0.235, 0.32, 0.405, 0.49, 0.575, 0.66, 0.745, 0.83, 0.915),   
+        scale          = 0.75,
+        distortion     = 0.40,           # constant
+        concavity      = 0.30,           # constant
+        target_rms     = 120 ):
+
     os.makedirs(output_dir, exist_ok=True)
-    shape_data = []
+    meta = []
 
-    # Define linear increments for parameters
-    sides_range = np.linspace(8, 24, n_shapes, dtype=int)
-    distortion_range = np.linspace(0.2, 0.8, n_shapes)
-    concavity_range = np.linspace(0.2, 0.9, n_shapes)
-    jaggedness_range = np.linspace(0.2, 0.9, n_shapes)
+    # parameter vectors with matching length
+    n_shapes   = len(sides_list)
+    jag_vals   = jagged_list
 
-    for i in range(n_shapes):
-        num_sides = sides_range[i]
-        distortion = distortion_range[i]
-        concavity = concavity_range[i]
-        jaggedness = jaggedness_range[i]
+    for idx, (n_sides, jag) in enumerate(zip(sides_list, jag_vals), 1):
 
+        # --- draw polygon ---------------------------------------------------
         fig, ax = plt.subplots(figsize=(5, 5), dpi=300)
-        points = generate_complex_polygon(num_sides, distortion, concavity, jaggedness, scale)
-        polygon = plt.Polygon(points, fill=True, color='black')
-        ax.add_patch(polygon)
+        pts     = generate_complex_polygon(n_sides, distortion, concavity,
+                                           jaggedness=jag, scale=scale)
+        ax.add_patch(plt.Polygon(pts, color='black'))
+        ax.set(xlim=(0,1), ylim=(0,1), aspect='equal'); ax.axis('off')
 
-        ax.set_xlim(0, 1)
-        ax.set_ylim(0, 1)
-        ax.set_aspect('equal')
-        ax.axis('off')
+        fname = os.path.join(output_dir, f"shape_{idx:02d}.png")
+        plt.savefig(fname, bbox_inches='tight', pad_inches=0.2); plt.close(fig)
 
-        filename = os.path.join(output_dir, f"shape_{i+1:02d}.png")
-        plt.savefig(filename, bbox_inches='tight', pad_inches=0.2)
-        plt.close()
+        # --- RMS‐contrast balancing (identical to before) -------------------
+        rms, it = compute_rms_contrast(fname), 0
+        while not (115 <= rms <= 125) and it < 20:
+            g  = cv2.imread(fname, cv2.IMREAD_GRAYSCALE); mu = np.mean(g)
+            g  = np.clip((g-mu)*(target_rms/rms)+mu, 0, 255).astype(np.uint8)
+            cv2.imwrite(fname, g); rms = compute_rms_contrast(fname); it += 1
 
-        # Contrast adjustment
-        contrast = compute_rms_contrast(filename)
-        desired_contrast = 120
-        max_iterations = 20
-        iterations = 0
+        meta.append(dict(File=fname, Sides=n_sides, Jaggedness=round(jag,3),
+                         Distortion=distortion, Concavity=concavity,
+                         RMS_Contrast=round(rms,2)))
+        print(f"✓ {fname} | sides={n_sides:<2d}  jag={jag:.2f}")
 
-        while (contrast < 115 or contrast > 125) and iterations < max_iterations:
-            img = cv2.imread(filename, cv2.IMREAD_GRAYSCALE)
-            mean_intensity = np.mean(img)
-            alpha = desired_contrast / contrast
-            adjusted = np.clip((img - mean_intensity) * alpha + mean_intensity, 0, 255).astype(np.uint8)
-            cv2.imwrite(filename, adjusted)
-            contrast = compute_rms_contrast(filename)
-            iterations += 1
-
-        shape_data.append({
-            "Filename": filename,
-            "Num Sides": num_sides,
-            "Distortion": round(distortion, 2),
-            "Concavity": round(concavity, 2),
-            "Jaggedness": round(jaggedness, 2),
-            "RMS Contrast": round(contrast, 2)
-        })
-
-        print(f"Saved: {filename}, RMS Contrast: {contrast:.2f}")
-
-    df = pd.DataFrame(shape_data)
+    # --- Excel log ----------------------------------------------------------
+    df = pd.DataFrame(meta)
     df.to_excel(os.path.join(output_dir, "shape_metadata.xlsx"), index=False)
-    print("Metadata saved.")
+    print("\nMetadata saved →", os.path.join(output_dir, "shape_metadata.xlsx"))
 
+# ────────── run as script ──────────────────────────────────────────────────
 if __name__ == "__main__":
-    generate_incremental_shapes()
+    generate_shapes()

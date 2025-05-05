@@ -1,56 +1,66 @@
+# harmonic_layers_and_f0_ONLY.py
 import numpy as np
-import scipy.io.wavfile as wav
-import os
-import pandas as pd
+from scipy.io.wavfile import write
+from scipy.signal import welch
+import pandas as pd, os, json
 
-def generate_sine_wave(freq, amplitude, duration, fs):
-    """Generate a sine wave at given frequency and amplitude."""
-    t = np.linspace(0, duration, int(fs * duration), endpoint=False)
-    return amplitude * np.sin(2 * np.pi * freq * t)
+# ---------------- GLOBAL CONSTANTS -----------------------------------------
+SR   = 44_100
+DUR  = 1.2
+F0_VALUES = [130, 146, 164, 174, 196, 220, 246, 261, 293, 329]  # C3 to E4 range (pleasant tones)
+N_HARM_LAYERS = [24, 22, 20, 18, 16, 14, 12, 10, 8, 6]
+TILT_VALUE = 3.5  # fixed tilt value
+assert len(F0_VALUES) == len(N_HARM_LAYERS), "F0 and harmonic lists must be same length"
 
-def main():
-    # Parameters
-    fs = 44100            # Sampling frequency (Hz)
-    duration = 1.0        # Duration in seconds
-    num_tones = 10        # Number of tones to generate
-    freq_start = 100      # Start frequency (Hz)
-    freq_end = 1000       # End frequency (Hz)
-    amp_start = 0.1       # Start amplitude (normalized)
-    amp_end = 0.9         # End amplitude (normalized)
+OUT_DIR = "generated_sounds"
+ENV_ATTACK, ENV_DECAY, ENV_SUS, ENV_REL = 0.015, 0.04, 0.85, 0.10
+VOLUME = 0.9
 
-    # Output directory
-    output_dir = "generated_sounds"
-    os.makedirs(output_dir, exist_ok=True)
+# ---------------- helper functions -----------------------------------------
+def adsr(t, a, d, s, r):
+    a_len, d_len, r_len = int(a*SR), int(d*SR), int(r*SR)
+    env = np.ones_like(t) * s
+    env[:a_len] = np.linspace(0, 1, a_len, endpoint=False)
+    env[a_len:a_len+d_len] = np.linspace(1, s, d_len, endpoint=False)
+    env[-r_len:] *= np.linspace(1, 0, r_len)
+    return env
 
-    # Linear spacing of frequency and amplitude
-    freqs = np.linspace(freq_start, freq_end, num_tones)
-    amps = np.linspace(amp_start, amp_end, num_tones)
+def synth_signal(n_harm, beta, f0, t):
+    sig = np.zeros_like(t)
+    for h in range(1, n_harm+1):
+        sig += (1 / (h**beta)) * np.sin(2*np.pi*f0*h*t)
+    return sig
 
-    # Store metadata
-    metadata = []
+def spectral_centroid(x, sr):
+    f, Pxx = welch(x, sr, nperseg=4096)
+    return np.sum(f * Pxx) / np.sum(Pxx)
 
-    for i in range(num_tones):
-        freq = freqs[i]
-        amp = amps[i]
-        tone = generate_sine_wave(freq, amp, duration, fs)
-        tone = np.int16(tone * 32767)  # Convert to 16-bit PCM format
+# ---------------- synthesis -------------------------------------------------
+os.makedirs(OUT_DIR, exist_ok=True)
+t = np.linspace(0, DUR, int(SR*DUR), endpoint=False)
 
-        filename = f"sound_{i+1:02d}.wav"
-        wav_path = os.path.join(output_dir, filename)
-        wav.write(wav_path, fs, tone)
+log = []
+for idx, (f0, n_h) in enumerate(zip(F0_VALUES, N_HARM_LAYERS), 1):
+    sig = synth_signal(n_h, TILT_VALUE, f0, t)
+    sig *= adsr(t, ENV_ATTACK, ENV_DECAY, ENV_SUS, ENV_REL)
+    sig /= np.max(np.abs(sig)) / VOLUME
+    wav = np.int16(sig * 32767)
 
-        print(f"Saved {filename} | Frequency: {freq:.1f} Hz | Amplitude: {amp:.2f}")
-        metadata.append({
-            "Sound": i+1,
-            "Frequency_Hz": freq,
-            "Amplitude": amp,
-            "Filename": filename
-        })
+    fname = f"sound_{idx:02d}.wav"
+    write(os.path.join(OUT_DIR, fname), SR, wav)
+    print("Saved", fname)
 
-    # Save metadata
-    df = pd.DataFrame(metadata)
-    df.to_excel(os.path.join(output_dir, "sound_metadata.xlsx"), index=False)
-    print("\nSaved tone metadata to 'sound_metadata.xlsx'.")
+    log.append({
+        "file": fname,
+        "F0_Hz": f0,
+        "harmonics": n_h,
+        "beta_tilt": TILT_VALUE,
+        "spectral_centroid_Hz": float(spectral_centroid(sig, SR))
+    })
 
-if __name__ == "__main__":
-    main()
+# ---------------- feature log ----------------------------------------------
+pd.DataFrame(log).to_csv(os.path.join(OUT_DIR, "tone_feature_log.csv"), index=False)
+with open(os.path.join(OUT_DIR, "tone_feature_log.json"), "w") as f:
+    json.dump(log, f, indent=2)
+
+print("\nFinished – 10 tones with varying F0 and harmonics saved in", OUT_DIR)
