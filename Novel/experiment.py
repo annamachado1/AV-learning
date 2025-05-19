@@ -399,13 +399,10 @@ def block2_passive():
             break_msg = visual.TextStim(
                 win,
                 text=(f"You may take a short break.\n\n"
-                      f"{idx} trials completed out of {total_trials}.\n\n"
                       "Press SPACEBAR when you are ready to continue."),
                 color="lightgrey", height=0.06, pos=(0, -0.85)
             )
             break_msg.draw()
-            progress_bg.draw()
-            progress_bar.draw()
             win.flip()
             event.waitKeys(keyList=["space"])
 
@@ -642,7 +639,6 @@ def block2_active():
                 break_msg = visual.TextStim(
                     win,
                     text=(f"You may take a short break.\n\n"
-                          f"{trial_index + 1} trials completed out of {total_trials}.\n\n"
                           "Press SPACEBAR when you are ready to continue."),
                     color="lightgrey", height=0.06, pos=(0, 0)
                 )
@@ -1112,4 +1108,3 @@ consolidate_data()
 # Cleanup
 win.close()
 core.quit()
-
