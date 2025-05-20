@@ -1071,6 +1071,9 @@ choice = main_menu()
 if choice == "1":
     result = block2_passive()
     participant_data["block_completed"] = True
+    # After passive, always do active as well
+    result = block2_active()
+    participant_data["block_completed"] = True
 elif choice == "2":
     result = block2_active()
     participant_data["block_completed"] = True
