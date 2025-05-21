@@ -33,12 +33,15 @@ def compute_rms_contrast(png_path):
 # ────────── main generator ─────────────────────────────────────────────────
 def generate_shapes(
         output_dir     = "generated_shapes",
-        sides_list     = (8, 10, 12, 14, 16, 18, 20, 22, 24, 26), 
-        jagged_list   = (0.15,  0.235, 0.32, 0.405, 0.49, 0.575, 0.66, 0.745, 0.83, 0.915),   
+        sides_list     = (8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30), 
+        jagged_list    = (0.15, 0.22, 0.29, 0.36, 0.43, 0.50, 0.57, 0.64, 0.71, 0.78, 0.85, 0.92),   
         scale          = 0.75,
         distortion     = 0.40,           # constant
         concavity      = 0.30,           # constant
         target_rms     = 120 ):
+
+    # Set random seed for reproducibility
+    np.random.seed(42)
 
     os.makedirs(output_dir, exist_ok=True)
     meta = []

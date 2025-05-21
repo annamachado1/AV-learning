@@ -33,12 +33,15 @@ def compute_rms_contrast(png_path):
 # ────────── main generator ─────────────────────────────────────────────────
 def generate_shapes(
         output_dir     = "generated_shapes_testset",
-        sides_list     = (7, 9, 12, 13, 15, 17, 19, 21, 23, 25),  # <- FIXED
-        jagged_list   = (0.065, 0.150, 0.235, 0.320, 0.405, 0.490, 0.575, 0.660, 0.745, 0.830,), 
+        sides_list     = (7, 9, 12, 13, 15, 17, 19, 21, 23, 25, 27, 29),  
+        jagged_list    = (0.065, 0.150, 0.235, 0.320, 0.405, 0.490, 0.575, 0.660, 0.745, 0.830, 0.915, 1.000), 
         scale          = 0.75,
         distortion     = 0.40,           # constant
         concavity      = 0.30,           # constant
         target_rms     = 120 ):
+
+    # Ensure reproducibility
+    np.random.seed(42)
 
     os.makedirs(output_dir, exist_ok=True)
     meta = []
@@ -59,7 +62,7 @@ def generate_shapes(
         fname = os.path.join(output_dir, f"shape_{idx:02d}.png")
         plt.savefig(fname, bbox_inches='tight', pad_inches=0.2); plt.close(fig)
 
-        # --- RMS‐contrast balancing (identical to before) -------------------
+        # --- RMS‐contrast balancing -------------------
         rms, it = compute_rms_contrast(fname), 0
         while not (115 <= rms <= 125) and it < 20:
             g  = cv2.imread(fname, cv2.IMREAD_GRAYSCALE); mu = np.mean(g)

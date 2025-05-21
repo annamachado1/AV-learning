@@ -7,8 +7,13 @@ import pandas as pd, os, json
 # ---------------- GLOBAL CONSTANTS -----------------------------------------
 SR   = 44_100
 DUR  = 1.2
-F0_VALUES = [130, 146, 164, 174, 196, 220, 246, 261, 293, 329]  # C3 to E4 range (pleasant tones)
-N_HARM_LAYERS = [24, 22, 20, 18, 16, 14, 12, 10, 8, 6]
+# F0_VALUES = [130, 138, 146, 155, 164, 174, 185, 196, 207, 220, 233, 246]  # C3 to B3 chromatic (12 tones)
+F0_START = 130
+F0_STEP = 10.545454545454545  # (246 - 130) / (12 - 1)
+HARM_START = 24
+HARM_STEP = -2  # decrement by 2 each time
+F0_VALUES = [round(F0_START + i * F0_STEP, 2) for i in range(12)]
+N_HARM_LAYERS = [HARM_START + i * HARM_STEP for i in range(12)]
 TILT_VALUE = 3.5  # fixed tilt value
 assert len(F0_VALUES) == len(N_HARM_LAYERS), "F0 and harmonic lists must be same length"
 
@@ -63,4 +68,4 @@ pd.DataFrame(log).to_csv(os.path.join(OUT_DIR, "tone_feature_log.csv"), index=Fa
 with open(os.path.join(OUT_DIR, "tone_feature_log.json"), "w") as f:
     json.dump(log, f, indent=2)
 
-print("\nFinished – 10 tones with varying F0 and harmonics saved in", OUT_DIR)
+print("\nFinished – 12 tones with varying F0 and harmonics saved in", OUT_DIR)

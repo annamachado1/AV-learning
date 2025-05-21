@@ -7,8 +7,13 @@ import pandas as pd, os, json
 # ---------------- GLOBAL CONSTANTS -----------------------------------------
 SR   = 44_100
 DUR  = 1.2
-F0_VALUES = [138, 155, 170, 185, 207, 233, 255, 275, 310, 345]  # shifted, mid-range
-N_HARM_LAYERS = [23, 21, 19, 17, 15, 13, 11, 9, 7, 5]           # slightly less than originals
+# F0_VALUES = [138, 155, 170, 185, 207, 233, 255, 275, 310, 345, 370, 400]  # shifted, mid-range
+F0_START = 135  # offset by +5 from create_sounds.py
+F0_STEP = 10.545454545454545
+HARM_START = 23  # offset by -1 from create_sounds.py
+HARM_STEP = -2
+F0_VALUES = [round(F0_START + i * F0_STEP, 2) for i in range(12)]
+N_HARM_LAYERS = [HARM_START + i * HARM_STEP for i in range(12)]
 TILT_VALUE = 3.5
 assert len(F0_VALUES) == len(N_HARM_LAYERS), "Mismatch in tone count!"
 
@@ -63,4 +68,4 @@ pd.DataFrame(log).to_csv(os.path.join(OUT_DIR, "tone_feature_log.csv"), index=Fa
 with open(os.path.join(OUT_DIR, "tone_feature_log.json"), "w") as f:
     json.dump(log, f, indent=2)
 
-print("\nFinished – 10 testset tones with new F0 and harmonics saved in", OUT_DIR)
+print("\nFinished – 12 testset tones with new F0 and harmonics saved in", OUT_DIR)
