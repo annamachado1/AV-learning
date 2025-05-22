@@ -46,6 +46,10 @@ def generate_shapes(
     os.makedirs(output_dir, exist_ok=True)
     meta = []
 
+    # Select every other shape (first, third, fifth, etc.), total 6 shapes
+    sides_list = sides_list[::2][:6]
+    jagged_list = jagged_list[::2][:6]
+
     # parameter vectors with matching length
     n_shapes   = len(sides_list)
     jag_vals   = jagged_list
@@ -59,7 +63,7 @@ def generate_shapes(
         ax.add_patch(plt.Polygon(pts, color='black'))
         ax.set(xlim=(0,1), ylim=(0,1), aspect='equal'); ax.axis('off')
 
-        fname = os.path.join(output_dir, f"shape_{idx:02d}.png")
+        fname = os.path.join(output_dir, f"shape_{idx}.png")
         plt.savefig(fname, bbox_inches='tight', pad_inches=0.2); plt.close(fig)
 
         # --- RMS‐contrast balancing -------------------

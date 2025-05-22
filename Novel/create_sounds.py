@@ -32,7 +32,7 @@ def adsr(t, a, d, s, r):
 
 def synth_signal(n_harm, beta, f0, t):
     sig = np.zeros_like(t)
-    for h in range(1, n_harm+1):
+    for h in range(1, n_h+1):
         sig += (1 / (h**beta)) * np.sin(2*np.pi*f0*h*t)
     return sig
 
@@ -45,13 +45,16 @@ os.makedirs(OUT_DIR, exist_ok=True)
 t = np.linspace(0, DUR, int(SR*DUR), endpoint=False)
 
 log = []
-for idx, (f0, n_h) in enumerate(zip(F0_VALUES, N_HARM_LAYERS), 1):
+sound_idx = 1
+for i in range(0, len(F0_VALUES), 2):
+    f0 = F0_VALUES[i]
+    n_h = N_HARM_LAYERS[i]
     sig = synth_signal(n_h, TILT_VALUE, f0, t)
     sig *= adsr(t, ENV_ATTACK, ENV_DECAY, ENV_SUS, ENV_REL)
     sig /= np.max(np.abs(sig)) / VOLUME
     wav = np.int16(sig * 32767)
 
-    fname = f"sound_{idx:02d}.wav"
+    fname = f"sound_{sound_idx:02d}.wav"
     write(os.path.join(OUT_DIR, fname), SR, wav)
     print("Saved", fname)
 
@@ -62,10 +65,11 @@ for idx, (f0, n_h) in enumerate(zip(F0_VALUES, N_HARM_LAYERS), 1):
         "beta_tilt": TILT_VALUE,
         "spectral_centroid_Hz": float(spectral_centroid(sig, SR))
     })
+    sound_idx += 1
 
 # ---------------- feature log ----------------------------------------------
-pd.DataFrame(log).to_csv(os.path.join(OUT_DIR, "tone_feature_log.csv"), index=False)
-with open(os.path.join(OUT_DIR, "tone_feature_log.json"), "w") as f:
+pd.DataFrame(log).to_csv(os.path.join(OUT_DIR, "sound_feature_log.csv"), index=False)
+with open(os.path.join(OUT_DIR, "sound_feature_log.json"), "w") as f:
     json.dump(log, f, indent=2)
 
-print("\nFinished – 12 tones with varying F0 and harmonics saved in", OUT_DIR)
+print("\nFinished – 6 sounds with varying F0 and harmonics saved in", OUT_DIR)

@@ -42,9 +42,15 @@ def generate_shapes(
 
     # Set random seed for reproducibility
     np.random.seed(42)
+    import random
+    random.seed(42)
 
     os.makedirs(output_dir, exist_ok=True)
     meta = []
+
+    # Only keep every other shape (even indices: 0,2,4,6,8,10)
+    sides_list = sides_list[::2]
+    jagged_list = jagged_list[::2]
 
     # parameter vectors with matching length
     n_shapes   = len(sides_list)
