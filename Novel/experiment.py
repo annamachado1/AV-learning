@@ -9,7 +9,7 @@ import numpy as np
 import traceback
 
 # Configure sound preferences
-prefs.hardware['audioLib'] = ['sounddevice', 'pygame']
+prefs.hardware['audioLib'] = ['pygame', 'sounddevice']
 prefs.general['audioDevice'] = ['default']
 
 # Set the path where images and sounds are stored
@@ -36,13 +36,19 @@ shape_files_main = [f"shape_{i:02d}.png" for i in range(1, 7)]
 sound_files_main = [f"sound_{i:02d}.wav" for i in range(1, 7)]
 stimuli_pairs = list(zip(shape_files_main, sound_files_main))
 
+# Test set pairings
+test_shape_files = [f"shape_{i:02d}.png" for i in range(1, 7)]
+test_sound_files = [f"sound_{i:02d}.wav" for i in range(1, 7)]
+test_pairs = list(zip(test_shape_files, test_sound_files))
+
+
 for shp, snd in stimuli_pairs:
     n_shape = int(shp.split('_')[1].split('.')[0])
     n_sound = int(snd.split('_')[1].split('.')[0])
     assert n_shape == n_sound, f"Mapping error: {shp} vs {snd}"
 
-all_trials = stimuli_pairs * 10  # Each pair appears 10 times
-random.shuffle(all_trials)  # Completely randomize order
+# Remove undefined all_trials shuffle
+# random.shuffle(all_trials)  # <-- REMOVE THIS LINE
 
 # Preload all sound objects for main and test sets
 def preload_sounds(audio_dir):
@@ -53,6 +59,7 @@ def preload_sounds(audio_dir):
 
 main_sounds = preload_sounds(audio_dir)
 test_sounds = preload_sounds(test_audio_dir)
+
 
 # Define utility functions first
 def get_participant_id():
@@ -74,71 +81,7 @@ def get_participant_id():
             os.remove(os.path.join(participant_folder, file))
 
     return participant_id
-
-def save_partial_results():
-    """Save results only if the participant does not complete the block."""
-    if not participant_data.get("block_completed", False):  # Check if block is incomplete
-        p_id = participant_data["participant_id"]
-        participant_folder = os.path.join("./participant_data", p_id)
-        os.makedirs(participant_folder, exist_ok=True)  # Ensure folder exists
-        
-        # Save free pairings data
-        if "free_pairings" in participant_data:
-            with open(os.path.join(participant_folder, f"{p_id}_free_pairings_partial.csv"), "w", newline="") as file:
-                writer = csv.writer(file)
-                writer.writerow(["Tone File", "Shape File", "Tone Position", "Shape Position"])
-                for pairing in participant_data["free_pairings"]:
-                    writer.writerow([
-                        pairing["tone_file"],
-                        pairing["shape_file"],
-                        pairing["tone_pos"],
-                        pairing["shape_pos"]
-                    ])
-        
-        # Save block 2 log
-        if "block 2 log" in participant_data:
-            log_filename = os.path.join(participant_folder, f"{p_id}_block2_log_partial.csv")
-            with open(log_filename, mode="w", newline="") as file:
-                writer = csv.writer(file)
-                writer.writerow(["Subblock", "Trial Index", "Trial Type", "Stimulus", "Audio", "Tone Order", "Correct Answer", "Response", "Reaction Time"])
-                for trial in participant_data["block 2 log"]:
-                    if isinstance(trial["tones_order"], list):
-                        tone_order_str = ", ".join(trial["tones_order"])
-                    else:
-                        tone_order_str = trial["tones_order"]
-                    writer.writerow([
-                        trial["subblock"],
-                        trial["trial_index"],
-                        trial["trial_type"],
-                        trial["stimulus"],
-                        trial["audio"],
-                        tone_order_str,
-                        trial["correct_answer"],
-                        trial["response"],
-                        trial["reaction_time"]
-                    ])
-
-def save_free_pairings_to_excel():
-    # Save free pairing data to Excel in the participant folder as free_pairings.xlsx
-    import os
-    import pandas as pd
-    participant_folder = os.path.join("./participant_data", participant_data["participant_id"])
-    os.makedirs(participant_folder, exist_ok=True)
-    df = pd.DataFrame(participant_data["free_pairings"])
-    excel_filename = os.path.join(participant_folder, "free_pairings.xlsx")
-    df.to_excel(excel_filename, index=False)
-    print(f"Block 0 data saved to {excel_filename}")
-
-def save_block1_to_excel():
-    # Save block 1 data to Excel in the participant folder as block1_log.xlsx
-    import os
-    import pandas as pd
-    participant_folder = os.path.join("./participant_data", participant_data["participant_id"])
-    os.makedirs(participant_folder, exist_ok=True)
-    df = pd.DataFrame(participant_data.get("block1_log", []))
-    excel_filename = os.path.join(participant_folder, "block1_log.xlsx")
-    df.to_excel(excel_filename, index=False)
-    print(f"Block 1 data saved to {excel_filename}")
+    
 
 def save_block2_to_excel():
     # Save block 2 data to Excel in the participant folder as block2_log.xlsx
@@ -151,32 +94,34 @@ def save_block2_to_excel():
     df.to_excel(excel_filename, index=False)
     print(f"Block 2 data saved to {excel_filename}")
 
-def consolidate_data():
-    # Consolidate all data into a single Excel file with multiple sheets in the participant folder.
+def save_block_4_to_excel():
+    # Save block 2 data to Excel in the participant folder as block4_log.xlsx
     import os
     import pandas as pd
     participant_folder = os.path.join("./participant_data", participant_data["participant_id"])
     os.makedirs(participant_folder, exist_ok=True)
-    excel_filename = os.path.join(participant_folder, "consolidated_data.xlsx")
-    with pd.ExcelWriter(excel_filename) as writer:
-        if "free_pairings" in participant_data:
-            pd.DataFrame(participant_data["free_pairings"]).to_excel(writer, sheet_name="free_pairings", index=False)
-        if "block1_log" in participant_data:
-            pd.DataFrame(participant_data["block1_log"]).to_excel(writer, sheet_name="block1_log", index=False)
-        if "block2_log" in participant_data:
-            pd.DataFrame(participant_data["block2_log"]).to_excel(writer, sheet_name="block2_log", index=False)
-    print(f"Consolidated data saved to {excel_filename}")
+    df = pd.DataFrame(participant_data.get("block_4_log", []))
+    excel_filename = os.path.join(participant_folder, "block_4_log.xlsx")
+    df.to_excel(excel_filename, index=False)
+    print(f"Block 4 data saved to {excel_filename}")
 
+# Add missing save_free_pairings_to_excel function
+def save_free_pairings_to_excel():
+    participant_folder = os.path.join("./participant_data", participant_data["participant_id"])
+    os.makedirs(participant_folder, exist_ok=True)
+    df = pd.DataFrame(participant_data.get("free_pairings", []))
+    excel_filename = os.path.join(participant_folder, "block1_free_pairings.xlsx")
+    df.to_excel(excel_filename, index=False)
+    print(f"Free pairings saved to {excel_filename}")
+
+# Add missing save_free_pairings_test_to_excel function
 def save_free_pairings_test_to_excel():
-    # Save second free pairing data to Excel in the participant folder as free_pairings_test.xlsx
-    import os
-    import pandas as pd
     participant_folder = os.path.join("./participant_data", participant_data["participant_id"])
     os.makedirs(participant_folder, exist_ok=True)
     df = pd.DataFrame(participant_data.get("free_pairings_test", []))
-    excel_filename = os.path.join(participant_folder, "free_pairings_test.xlsx")
+    excel_filename = os.path.join(participant_folder, "block3_free_pairings.xlsx")
     df.to_excel(excel_filename, index=False)
-    print(f"Second free pairing (test set) data saved to {excel_filename}")
+    print(f"Test free pairings saved to {excel_filename}")
 
 def show_instructions(text, key_list):
     """Display instructions and wait for a key in key_list. Returns the key pressed."""
@@ -231,7 +176,6 @@ def block1_free_pairings_train():
     "On the next screen, you’ll see a list of shapes and a list of sounds.\n"
     "Click a musical note to hear its sound,\n"
     "then click the shape you think goes best with that sound.\n\n"
-    "Take your time.\n\n"
     "Press SPACEBAR to continue.",
     ["space"]
 )
@@ -276,7 +220,7 @@ def block1_free_pairings_train():
             while any(mouse.getPressed()):
                 core.wait(0.01)
 
-        # ───── handle keyboard ─────────────────────────────────────────
+        # ───── handle keyboard ───────────���─────────────────────────────
         keys = event.getKeys()
         if "escape" in keys:
             win.close(); core.quit()
@@ -326,9 +270,9 @@ def block2_passive():
     show_instructions(instructions_text, ["space"])
 
     # ─── prepare trial list ──────────��──────────────────────────────────
-    if participant_data.get("free_pairings"):
+    if participant_data.get("stimuli_pairs"):
         trials = [(p["shape_file"], p["tone_file"])
-                  for p in participant_data["free_pairings"]]
+                  for p in participant_data["stimuli_pairs"]]
     else:
         trials = list(stimuli_pairs)
     trials *= 33  # 6 pairs × 33 = 198 trials
@@ -452,13 +396,14 @@ def block2_active():
     print("Starting Block 1 Active...")
 
     instruction_result = show_instructions(
-        "Instructions: \n\n"
+        "Matching Task Instructions: \n\n"
         "You will either:\n"
         "1. see one shape and hear two different sounds (shape+2sounds trial) or\n"
         "2. hear one sound and see two different shapes (sound+2shapes trial).\n\n"
         "For shape+2sounds trials, press '1' if the first sound matches the shape, '2' if the second sound matches. \n"
         "For sound+2shapes trials, press '1' if the first shape matches the sound, '2' if the second shape matches.\n\n"
         "You will receive feedback after each trial.\n\n"
+        "Please wait until prompted to press the keys.\n"
         "Press SPACEBAR to continue.",
         ["space"]
     )
@@ -529,7 +474,6 @@ def block2_active():
         for trial_index, (img_file, audio_file) in enumerate(active_trials):
             event.clearEvents()
             if "escape" in event.getKeys():
-                save_partial_results()
                 win.close()
                 core.quit()
 
@@ -608,7 +552,7 @@ def block2_active():
                 else:
                     correct_answer = "2"
 
-# ...existing code...
+
             elif trial_type == "shape+2sounds":
                 image_path = os.path.join(image_dir, img_file)
                 available_tones = [snd for snd in [pair[1] for pair in stimuli_pairs] if snd != audio_file]
@@ -664,7 +608,8 @@ def block2_active():
                     correct_answer = "1"
                 else:
                     correct_answer = "2"
-# ...existing code...
+                
+
 
             participant_data["reaction time"].append(reaction_time)
             if response == correct_answer:
@@ -694,7 +639,7 @@ def block2_active():
                     "response": response,
                     "reaction_time": reaction_time,
                     "pairings": list(stimuli_pairs),
-                    "order": tones if trial_type == "shape+2sounds" else images if trial_type == "sound+2shapes" else ""
+                    "order": tones if trial_type == "shape+2sounds" else images if trial_type == "sound+2shapes" else "N/A",
                 })
             except Exception as log_err:
                 print(f"Logging error at trial {trial_index}:")
@@ -705,7 +650,6 @@ def block2_active():
                 core.quit()
 
             event.clearEvents()
-            save_partial_results()
 
             # Show break message after every TRIALS_BEFORE_BREAK trials
             if (trial_index + 1) % TRIALS_BEFORE_BREAK == 0 and (trial_index + 1) < total_trials:
@@ -739,17 +683,223 @@ def block2_active():
         traceback.print_exc()
         core.quit()
 
+# Remove nested block4_testing definition
 def block4_testing():
-    """Main function for Block 2: test on new dataset (testset)."""
-    trials = block_two_subtrial()
-    TRIALS_PER_SUBBLOCK = 33  # 6 pairs × 33 = 198 trials, split into 6 subblocks of 33
-    num_subblocks = len(trials) // TRIALS_PER_SUBBLOCK
-    for subblock in range(num_subblocks):
-        start = subblock * TRIALS_PER_SUBBLOCK
-        end = start + TRIALS_PER_SUBBLOCK
-        block_two_subblock(subblock + 1, trials[start:end])
-        if subblock < num_subblocks - 1:
-            block_two_break()
+    global participant_data
+    participant_data["block_4_log"] = []
+
+    instruction_result = show_instructions(
+        "Final Matching Task Instructions: \n\n"
+        "You will either:\n"
+        "1. see one shape and hear two different sounds (shape+2sounds trial) or\n"
+        "2. hear one sound and see two different shapes (sound+2shapes trial).\n\n"
+        "For shape+2sounds trials, press '1' if the first sound matches the shape, '2' if the second sound matches. \n"
+        "For sound+2shapes trials, press '1' if the first shape matches the sound, '2' if the second shape matches.\n\n"
+        "Please wait until prompted to press the keys.\n"
+        "You will NOT receive feedback after each trial.\n\n"
+        "Press SPACEBAR to continue.",
+        ["space"]
+    )
+
+    try:
+        active_trials = test_pairs * 33
+        random.shuffle(active_trials)
+
+        # Setup progress bar
+        total_trials = len(active_trials)
+        progress_value = 0.0
+        bar_width = 0.5
+        bar_height = 0.07
+        bar_y = -0.7
+        left_edge = -bar_width / 2.0
+
+        def create_progress_bar(p_value):
+            x1 = left_edge
+            x2 = left_edge + (p_value * bar_width)
+            fillColor = 'blue'
+            vertices = [(x1, bar_y - bar_height / 2),
+                        (x2, bar_y - bar_height / 2),
+                        (x2, bar_y + bar_height / 2),
+                        (x1, bar_y + bar_height / 2)]
+            return visual.ShapeStim(
+                win,
+                vertices=vertices,
+                fillColor=fillColor,
+                lineColor=None,
+                closeShape=True
+            )
+
+        progress_bg = visual.ShapeStim(
+            win,
+            vertices=[(left_edge, bar_y - bar_height / 2),
+                      (left_edge + bar_width, bar_y - bar_height / 2),
+                      (left_edge + bar_width, bar_y + bar_height / 2),
+                      (left_edge, bar_y + bar_height / 2)],
+            fillColor='darkgrey',
+            lineColor='white',
+            closeShape=True
+        )
+        progress_bar = create_progress_bar(progress_value)
+
+        # Reusable stimuli
+        fixation = visual.TextStim(win, text="+", color="lightgrey", height=0.1, pos=(0, 0))
+        prompt_shape2 = visual.TextStim(win, text="Press 1 if FIRST shape matches; 2 if SECOND shape matches.",
+                                        color="white", height=0.05, pos=(0, 0))
+        prompt_sound2 = visual.TextStim(win, text="Press 1 if FIRST sound matches; 2 if SECOND sound matches.",
+                                        color="white", height=0.05, pos=(0, 0))
+        img_stim = visual.ImageStim(win, image=None, size=(0.3, 0.4), pos=(0, 0))
+
+        for trial_index, (img_file, audio_file) in enumerate(active_trials):
+            if "escape" in event.getKeys():
+                win.close()
+                core.quit()
+
+            trial_clock = core.Clock()
+            trial_type = random.choice(["sound+2shapes", "shape+2sounds"])
+            tones = None
+            correct_answer = None
+            response = None
+
+            correct_sound = dict(test_pairs).get(img_file)
+            correct_shape = {v: k for k, v in test_pairs}.get(audio_file)
+
+            # Shape+2sounds
+            if trial_type == "shape+2sounds":
+                image_path = os.path.join(test_image_dir, img_file)
+                available_tones = [snd for snd in test_sound_files if snd != audio_file]
+                incorrect_tone = random.choice(available_tones)
+                tones = [audio_file, incorrect_tone]
+                random.shuffle(tones)
+
+                for i in range(2):
+                    fixation.draw()
+                    progress_bg.draw()
+                    progress_bar.draw()
+                    win.flip()
+                    core.wait(0.5)
+
+                    img_stim.image = image_path
+                    img_stim.draw()
+                    progress_bg.draw()
+                    progress_bar.draw()
+                    win.flip()
+                    core.wait(0.5)
+
+                    test_sounds[tones[i]].play()
+                    core.wait(1.0)
+
+                prompt_sound2.draw()
+                progress_bg.draw()
+                progress_bar.draw()
+                win.flip()
+                trial_clock.reset()
+
+                while trial_clock.getTime() < 5:
+                    keys = event.getKeys(keyList=["1", "2", "escape"])
+                    if "escape" in keys:
+                        win.close(); core.quit()
+                    elif keys:
+                        response = keys[0]
+                        break
+                    core.wait(0.01)  # Wait for 0.01 seconds before checking response
+
+                if response is None:
+                    response = "NA"
+
+                reaction_time = round(trial_clock.getTime(), 3)
+                correct_answer = "1" if tones[0] == correct_sound else "2"
+
+            # Sound+2shapes
+            elif trial_type == "sound+2shapes":
+                available_images = [shp for shp in test_shape_files if shp != img_file]
+                distractor = random.choice(available_images)
+                images = [img_file, distractor]
+                random.shuffle(images)
+
+                for i in range(2):
+                    fixation.draw()
+                    progress_bg.draw()
+                    progress_bar.draw()
+                    win.flip()
+                    core.wait(0.5)
+
+                    img_stim.image = os.path.join(test_image_dir, images[i])
+                    img_stim.draw()
+                    progress_bg.draw()
+                    progress_bar.draw()
+                    win.flip()
+                    core.wait(0.5)
+
+                    test_sounds[audio_file].play()
+                    core.wait(1.0)
+
+                prompt_shape2.draw()
+                progress_bg.draw()
+                progress_bar.draw()
+                win.flip()
+                trial_clock.reset()
+
+                while trial_clock.getTime() < 5:
+                    keys = event.getKeys(keyList=["1", "2", "escape"])
+                    if "escape" in keys:
+                        win.close(); core.quit()
+                    elif keys:
+                        response = keys[0]
+                        break
+
+                if response is None:
+                    response = "NA"
+
+                reaction_time = round(trial_clock.getTime(), 3)
+                correct_answer = "1" if images[0] == correct_shape else "2"
+
+            # Log results
+            participant_data["reaction time"].append(reaction_time)
+            trial_data = {
+                "trial_index": trial_index,
+                "trial_type": trial_type,
+                "stimulus": img_file,
+                "audio": audio_file,
+                "tones_order": tones if trial_type == "shape+2sounds" else "N/A",
+                "correct_answer": correct_answer,
+                "response": response,
+                "reaction_time": reaction_time,
+                "pairings": list(test_pairs),
+                "order": tones if trial_type == "shape+2sounds" else images if trial_type == "sound+2shapes" else "N/A",
+            }
+            participant_data["block_4_log"].append(trial_data)
+
+            # Update progress bar
+            progress_value += 1.0 / total_trials
+            progress_bar = create_progress_bar(progress_value)
+
+            # Break every N trials
+            if (trial_index + 1) % 33 == 0 and (trial_index + 1) < total_trials:
+                break_msg = visual.TextStim(win, text="You may take a short break.\n\nPress SPACEBAR to continue.",
+                                            color="lightgrey", height=0.06, pos=(0, 0))
+                break_msg.draw()
+                win.flip()
+                event.waitKeys(keyList=["space"])
+                progress_bar = create_progress_bar(progress_value)
+
+        # End of block
+        end_msg = visual.TextStim(
+            win,
+            text="You have completed the experiment.\n\nPress SPACEBAR to continue.",
+            color="lightgrey", height=0.06, pos=(0, 0)
+        )
+        end_msg.draw()
+        win.flip()
+        event.waitKeys(keyList=["space"])
+
+        print("Block 4 completed successfully.")
+        return "done"
+
+    except Exception as e:
+        print("Error during Block 4:")
+        traceback.print_exc()
+        core.quit()
+
 
 def block_two_subtrial():
     # Use shape_01.png–shape_06.png and sound_01.wav–sound_06.wav from test set, paired by index
@@ -832,7 +982,6 @@ def block_two_subblock(subblock, trials):
 
     for trial_index, (img_file, audio_file) in enumerate(trials):
         if "escape" in event.getKeys():
-            save_partial_results()
             win.close()
             core.quit()
 
@@ -925,10 +1074,9 @@ def block_two_subblock(subblock, trials):
                 "response": response,
                 "reaction_time": reaction_time,
                 "pairings": list(zip(test_shape_files, [audio_file]*len(test_shape_files))),
-                "order": tones if trial_type == "shape+2sounds" else images if trial_type == "sound+2shapes" else ""
+                "order": tones if trial_type == "shape+2sounds" else images if trial_type == "sound+2shapes" else "N/A",
             }
             participant_data["block 2 log"].append(trial_data)
-            save_partial_results()
 
         elif trial_type == "shape+2sounds":
             # --- Fixation before first stimulus ---
@@ -949,7 +1097,6 @@ def block_two_subblock(subblock, trials):
             incorrect_tone = random.choice(available_tones)
             tones = [audio_file, incorrect_tone]
             random.shuffle(tones)
-            # ...existing code...
 
             response = None
             while trial_clock.getTime() < 5.0:  # Updated response window to 5 seconds
@@ -988,53 +1135,11 @@ def block_two_subblock(subblock, trials):
                 "response": response,
                 "reaction_time": reaction_time,
                 "pairings": list(zip(test_shape_files, [audio_file]*len(test_shape_files))),
-                "order": tones if trial_type == "shape+2sounds" else images if trial_type == "sound+2shapes" else ""
+                "order": tones if trial_type == "shape+2sounds" else images if trial_type == "sound+2shapes" else "N/A",
+
             }
             participant_data["block 2 log"].append(trial_data)
-            save_partial_results()
 
-def block_two_break():
-    """Provide a break between subblocks in Block 2."""
-    break_message = visual.TextStim(
-        win,
-        text="Take a short break.\n\nThe next part will begin in 30 seconds.",
-        color="lightgrey",
-        height=0.06,
-        pos=(0, 0)
-    )
-    break_message.draw()
-    win.flip()
-    core.wait(30)  # 30 seconds break
-
-    continue_message = visual.TextStim(
-        win,
-        text="Break over. Press SPACEBAR to continue.",
-        color="lightgrey",
-        height=0.06,
-        pos=(0, 0)
-    )
-    continue_message.draw()
-    win.flip()
-    event.waitKeys(keyList=["space"])
-
-def save_results():
-    """Save final results after the experiment is completed."""
-    try:
-        participant_folder = os.path.join("./participant_data", participant_data["participant_id"])
-        os.makedirs(participant_folder, exist_ok=True)
-        results_file = os.path.join(participant_folder, f"{participant_data['participant_id']}_final_results.csv")
-        with open(results_file, mode="w", newline="") as file:
-            writer = csv.writer(file)
-            writer.writerow(["Key", "Value"])
-            for key, value in participant_data.items():
-                if isinstance(value, (list, dict)):
-                    writer.writerow([key, json.dumps(value)])  # Serialize nested structures
-                else:
-                    writer.writerow([key, value])
-        print(f"Final results saved to {results_file}")
-    except Exception as e:
-        print(f"Error saving final results: {e}")
-        traceback.print_exc()
 
 def save_block1_pairings():
     """Save Block 1 pairings as block1_pairings.csv."""
@@ -1137,7 +1242,7 @@ def show_end_screen():
     """Display the end screen."""
     end_message = visual.TextStim(
         win,
-        text="End of the experiment.",
+        text="End of the experiment. Thank you for participating! Press SPACEBAR to exit.",
         color="lightgrey",
         height=0.06,
         pos=(0, 0)
@@ -1182,7 +1287,6 @@ def block3_free_pairings_test():
         "On the next screen, you’ll see a list of shapes and a list of sounds.\n"
         "Click a musical note to hear its sound,\n"
         "then click the shape you think goes best with that sound.\n\n"
-        "Take your time.\n\n"
         "Press SPACEBAR to continue.",
         ["space"]
     )
@@ -1273,6 +1377,8 @@ elif choice == "2":
     participant_data["block_completed"] = True
 else:
     result = None
+save_block2_active()
+save_block2_to_excel()
 
 # Block 3: Free pairings with test data
 block3_free_pairings_test()
@@ -1280,40 +1386,22 @@ save_block3_pairings()
 save_free_pairings_test_to_excel()  # <-- Save second free pairings here
 
 # Block 4: Testing block
-show_instructions(
-    "Final Matching Task Instructions: \n\n"
-    "You will either:\n"
-    "1. see one shape and hear two different sounds (shape+2sounds trial) or\n"
-    "2. hear one sound and see two different shapes (sound+2shapes trial).\n\n"
-    "For shape+2sounds trials, press '1' if the first sound matches the shape, '2' if the second sound matches. \n"
-    "For sound+2shapes trials, press '1' if the first shape matches the sound, '2' if the second shape matches.\n\n"
-    "You will NOT receive feedback.\n\n"
-    "Press SPACEBAR to continue.",
-    ["space"]
-)
 block4_testing()
 participant_data["block_completed"] = True
 result = "done"
+save_block_4_to_excel()
 
 # --- End workflow ---
 
 # Ensure the experiment does not terminate prematurely
 if result == "done":
-    save_partial_results()
-    save_results()
     show_end_screen()
-    show_instructions("Thank you for participating!\n\nPress SPACEBAR to exit.", ["space"])
 
 # Save data after each block
-save_free_pairings_to_excel()
-save_free_pairings_test_to_excel()  # <-- Also save at the end, for redundancy
-save_block1_to_excel()
 save_block2_to_excel()
 save_block2_active()
-save_block4_test()
+save_block_4_to_excel()
 
-# Consolidate all data into a single file
-consolidate_data()
 
 # Cleanup
 win.close()

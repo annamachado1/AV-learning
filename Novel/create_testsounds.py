@@ -54,7 +54,7 @@ for out_idx, idx in enumerate(selected_indices, 1):
     sig /= np.max(np.abs(sig)) / VOLUME
     wav = np.int16(sig * 32767)
 
-    fname = f"sound_{out_idx:01d}.wav"
+    fname = f"sound_0{out_idx:01d}.wav"
     write(os.path.join(OUT_DIR, fname), SR, wav)
     print("Saved", fname)
 

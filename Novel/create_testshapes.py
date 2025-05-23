@@ -63,7 +63,7 @@ def generate_shapes(
         ax.add_patch(plt.Polygon(pts, color='black'))
         ax.set(xlim=(0,1), ylim=(0,1), aspect='equal'); ax.axis('off')
 
-        fname = os.path.join(output_dir, f"shape_{idx}.png")
+        fname = os.path.join(output_dir, f"shape_0{idx}.png")
         plt.savefig(fname, bbox_inches='tight', pad_inches=0.2); plt.close(fig)
 
         # --- RMS‐contrast balancing -------------------
