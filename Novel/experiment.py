@@ -94,18 +94,18 @@ def save_block2_to_excel():
     df.to_excel(excel_filename, index=False)
     print(f"Block 2 data saved to {excel_filename}")
 
-def save_block_4_to_excel():
-    # Save block 2 data to Excel in the participant folder as block4_log.xlsx
+def save_block4_to_excel():
+    # Save block 4 data to Excel in the participant folder as block4_log.xlsx
     import os
     import pandas as pd
     participant_folder = os.path.join("./participant_data", participant_data["participant_id"])
     os.makedirs(participant_folder, exist_ok=True)
-    df = pd.DataFrame(participant_data.get("block_4_log", []))
-    excel_filename = os.path.join(participant_folder, "block_4_log.xlsx")
+    df = pd.DataFrame(participant_data.get("block4_log", []))
+    excel_filename = os.path.join(participant_folder, "block4_log.xlsx")
     df.to_excel(excel_filename, index=False)
     print(f"Block 4 data saved to {excel_filename}")
 
-# Add missing save_free_pairings_to_excel function
+# Save_free_pairings_to_excel function
 def save_free_pairings_to_excel():
     participant_folder = os.path.join("./participant_data", participant_data["participant_id"])
     os.makedirs(participant_folder, exist_ok=True)
@@ -114,7 +114,7 @@ def save_free_pairings_to_excel():
     df.to_excel(excel_filename, index=False)
     print(f"Free pairings saved to {excel_filename}")
 
-# Add missing save_free_pairings_test_to_excel function
+# Save_free_pairings_test_to_excel function
 def save_free_pairings_test_to_excel():
     participant_folder = os.path.join("./participant_data", participant_data["participant_id"])
     os.makedirs(participant_folder, exist_ok=True)
@@ -129,10 +129,12 @@ def show_instructions(text, key_list):
     while True:
         instr.draw()
         win.flip()
-        keys = event.waitKeys(keyList=key_list + ["escape"])
+        keys = event.waitKeys(keyList=key_list + ["escape", "s"])
         if "escape" in keys:
             win.close()
             core.quit()
+        if "s" in keys:
+            return "s"
         if keys:
             return keys[0]
 
@@ -171,14 +173,16 @@ def block1_free_pairings_train():
     selected_tone = None
     mouse = event.Mouse(visible=True)
 
-    show_instructions(
-    "Welcome to the experiment!\n\n"
-    "On the next screen, you’ll see a list of shapes and a list of sounds.\n"
-    "Click a musical note to hear its sound,\n"
-    "then click the shape you think goes best with that sound.\n\n"
-    "Press SPACEBAR to continue.",
-    ["space"]
-)
+    instr_result = show_instructions(
+        "Welcome to the experiment!\n\n"
+        "On the next screen, you’ll see a list of shapes and a list of sounds.\n"
+        "Click a musical note to hear its sound,\n"
+        "then click the shape you think goes best with that sound.\n\n"
+        "Press SPACEBAR to continue.",
+        ["space"]
+    )
+    if instr_result == "s":
+        return "skip"
 
 
     while True:  # fixed indentation level
@@ -221,9 +225,11 @@ def block1_free_pairings_train():
                 core.wait(0.01)
 
         # ───── handle keyboard ───────────���─────────────────────────────
-        keys = event.getKeys()
+        keys = event.getKeys(keyList=["escape", "space", "s"])
         if "escape" in keys:
             win.close(); core.quit()
+        elif "s" in keys:
+            return "skip"
         elif "space" in keys and all("paired_shape" in t for t in tones):
             break
 
@@ -267,7 +273,9 @@ def block2_passive():
         "There will be a short breaks throughout.\n\n"
         "Press SPACEBAR when you are ready to begin."
     )
-    show_instructions(instructions_text, ["space"])
+    instr_result = show_instructions(instructions_text, ["space"])
+    if instr_result == "s":
+        return "skip"
 
     # ─── prepare trial list ──────────��──────────────────────────────────
     if participant_data.get("stimuli_pairs"):
@@ -344,6 +352,8 @@ def block2_passive():
         if "escape" in event.getKeys():
             win.close()
             core.quit()
+        if "s" in event.getKeys(keyList=["s"]):
+            return "skip"
 
         # fixation
         fixation.draw()
@@ -374,7 +384,9 @@ def block2_passive():
             break_msg.draw()
 
             win.flip()
-            event.waitKeys(keyList=["space"])
+            keys = event.waitKeys(keyList=["space", "s"])
+            if "s" in keys:
+                return "skip"
             # After the break, update the progress bar again
             progress_bar = create_progress_bar(progress_value)
 
@@ -382,7 +394,9 @@ def block2_passive():
     progress_bg.draw()
     progress_bar.draw()
     win.flip()
-    event.waitKeys(keyList=["space"])
+    keys = event.waitKeys(keyList=["space", "s"])
+    if "s" in keys:
+        return "skip"
 
     participant_data["block2_passive_completed"] = True
     return "done"
@@ -393,7 +407,7 @@ def block2_active():
     participant_data["block2_log"] = []
     event.clearEvents()
 
-    print("Starting Block 1 Active...")
+    print("Starting Block 2 Active...")
 
     instruction_result = show_instructions(
         "Matching Task Instructions: \n\n"
@@ -403,16 +417,19 @@ def block2_active():
         "For shape+2sounds trials, press '1' if the first sound matches the shape, '2' if the second sound matches. \n"
         "For sound+2shapes trials, press '1' if the first shape matches the sound, '2' if the second shape matches.\n\n"
         "You will receive feedback after each trial.\n\n"
-        "Please wait until prompted to press the keys.\n"
+        "These shape–sound pairs have been PRE-ASSIGNED and may be different from the pairs you chose earlier.\n"
+        "Please wait until prompted to give your response.\n"
         "Press SPACEBAR to continue.",
         ["space"]
     )
+    if instruction_result == "s":
+        return "skip"
     if instruction_result != "space":
-        print("Block 1 Active skipped.")
+        print("Block 2 Active skipped.")
         return "skip"
 
     try:
-        print("Entering trial loop for Block 1 Active...")
+        print("Entering trial loop for Block 2 Active...")
         # Use every other pair for active trials
         local_stimuli = list(stimuli_pairs)
         random.shuffle(local_stimuli)
@@ -476,6 +493,8 @@ def block2_active():
             if "escape" in event.getKeys():
                 win.close()
                 core.quit()
+            if "s" in event.getKeys(keyList=["s"]):
+                return "skip"
 
             trial_clock = core.Clock()
             trial_type = random.choice(["sound+2shapes", "shape+2sounds"])
@@ -537,9 +556,11 @@ def block2_active():
                 win.flip()
                 trial_clock.reset()
                 while trial_clock.getTime() < 5:
-                    keys = event.getKeys(keyList=["1", "2", "escape"])
+                    keys = event.getKeys(keyList=["1", "2", "escape", "s"])
                     if "escape" in keys:
                         win.close(); core.quit()
+                    elif "s" in keys:
+                        return "skip"
                     elif keys:
                         response = keys[0]
                         break
@@ -594,9 +615,11 @@ def block2_active():
                 win.flip(); trial_clock.reset()
 
                 while trial_clock.getTime() < 5:
-                    keys = event.getKeys(keyList=["1", "2", "escape"])
+                    keys = event.getKeys(keyList=["1", "2", "escape", "s"])
                     if "escape" in keys:
                         win.close(); core.quit()
+                    elif "s" in keys:
+                        return "skip"
                     elif keys:
                         response = keys[0]
                         break
@@ -661,7 +684,9 @@ def block2_active():
                 )
                 break_msg.draw()
                 win.flip()
-                event.waitKeys(keyList=["space"])
+                keys = event.waitKeys(keyList=["space", "s"])
+                if "s" in keys:
+                    return "skip"
                 # After the break, update the progress bar again
                 progress_bar = create_progress_bar(progress_value)
 
@@ -673,7 +698,9 @@ def block2_active():
         )
         end_msg.draw()
         win.flip()
-        event.waitKeys(keyList=["space"])
+        keys = event.waitKeys(keyList=["space", "s"])
+        if "s" in keys:
+            return "skip"
 
         print("Block 1 Active completed successfully.")
         return "done"
@@ -686,7 +713,7 @@ def block2_active():
 # Remove nested block4_testing definition
 def block4_testing():
     global participant_data
-    participant_data["block_4_log"] = []
+    participant_data["block4_log"] = []
 
     instruction_result = show_instructions(
         "Final Matching Task Instructions: \n\n"
@@ -700,6 +727,8 @@ def block4_testing():
         "Press SPACEBAR to continue.",
         ["space"]
     )
+    if instruction_result == "s":
+        return "skip"
 
     try:
         active_trials = test_pairs * 33
@@ -753,6 +782,8 @@ def block4_testing():
             if "escape" in event.getKeys():
                 win.close()
                 core.quit()
+            if "s" in event.getKeys(keyList=["s"]):
+                return "skip"
 
             trial_clock = core.Clock()
             trial_type = random.choice(["sound+2shapes", "shape+2sounds"])
@@ -794,14 +825,27 @@ def block4_testing():
                 win.flip()
                 trial_clock.reset()
 
-                while trial_clock.getTime() < 5:
-                    keys = event.getKeys(keyList=["1", "2", "escape"])
+                #while trial_clock.getTime() < 5:
+                    #keys = event.getKeys(keyList=["1", "2", "escape", "s"])
+                    #if "escape" in keys:
+                        #win.close(); core.quit()
+                    #elif "s" in keys:
+                        #return "skip"
+                    #elif keys:
+                        #response = keys[0]
+                        #break
+                    #core.wait(0.01)  # Wait for 0.01 seconds before checking response
+                timer = core.Clock()
+                while timer.getTime() < 5:
+                    keys = event.getKeys(keyList=["1", "2", "escape", "s"])
                     if "escape" in keys:
                         win.close(); core.quit()
+                    elif "s" in keys:
+                        return "skip"
                     elif keys:
                         response = keys[0]
                         break
-                    core.wait(0.01)  # Wait for 0.01 seconds before checking response
+                    #win.flip()  # <--- safely redraw to keep the OS happy
 
                 if response is None:
                     response = "NA"
@@ -840,9 +884,11 @@ def block4_testing():
                 trial_clock.reset()
 
                 while trial_clock.getTime() < 5:
-                    keys = event.getKeys(keyList=["1", "2", "escape"])
+                    keys = event.getKeys(keyList=["1", "2", "escape", "s"])
                     if "escape" in keys:
                         win.close(); core.quit()
+                    elif "s" in keys:
+                        return "skip"
                     elif keys:
                         response = keys[0]
                         break
@@ -867,7 +913,7 @@ def block4_testing():
                 "pairings": list(test_pairs),
                 "order": tones if trial_type == "shape+2sounds" else images if trial_type == "sound+2shapes" else "N/A",
             }
-            participant_data["block_4_log"].append(trial_data)
+            participant_data["block4_log"].append(trial_data)
 
             # Update progress bar
             progress_value += 1.0 / total_trials
@@ -879,7 +925,9 @@ def block4_testing():
                                             color="lightgrey", height=0.06, pos=(0, 0))
                 break_msg.draw()
                 win.flip()
-                event.waitKeys(keyList=["space"])
+                keys = event.waitKeys(keyList=["space", "s"])
+                if "s" in keys:
+                    return "skip"
                 progress_bar = create_progress_bar(progress_value)
 
         # End of block
@@ -890,7 +938,9 @@ def block4_testing():
         )
         end_msg.draw()
         win.flip()
-        event.waitKeys(keyList=["space"])
+        keys = event.waitKeys(keyList=["space", "s"])
+        if "s" in keys:
+            return "skip"
 
         print("Block 4 completed successfully.")
         return "done"
@@ -1141,92 +1191,6 @@ def block_two_subblock(subblock, trials):
             participant_data["block 2 log"].append(trial_data)
 
 
-def save_block1_pairings():
-    """Save Block 1 pairings as block1_pairings.csv."""
-    participant_folder = os.path.join("./participant_data", participant_data["participant_id"])
-    os.makedirs(participant_folder, exist_ok=True)
-    filename = os.path.join(participant_folder, "block1_pairings.csv")
-    with open(filename, "w", newline="") as file:
-        writer = csv.writer(file)
-        writer.writerow(["tone_file", "shape_file", "sound_index", "shape_index", "tone_pos", "shape_pos"])
-        for pairing in participant_data.get("free_pairings", []):
-            writer.writerow([
-                pairing["tone_file"],
-                pairing["shape_file"],
-                pairing["sound_index"],
-                pairing["shape_index"],
-                pairing["tone_pos"],
-                pairing["shape_pos"]
-            ])
-
-def save_block3_pairings():
-    """Save Block 3 pairings as block3_pairings.csv."""
-    participant_folder = os.path.join("./participant_data", participant_data["participant_id"])
-    os.makedirs(participant_folder, exist_ok=True)
-    filename = os.path.join(participant_folder, "block3_pairings.csv")
-    with open(filename, "w", newline="") as file:
-        writer = csv.writer(file)
-        writer.writerow(["tone_file", "shape_file", "sound_index", "shape_index", "tone_pos", "shape_pos"])
-        for pairing in participant_data.get("free_pairings_test", []):
-            writer.writerow([
-                pairing["tone_file"],
-                pairing["shape_file"],
-                pairing["sound_index"],
-                pairing["shape_index"],
-                pairing["tone_pos"],
-                pairing["shape_pos"]
-            ])
-
-def save_block2_active():
-    """Save Block 2 active data as block2_active.csv."""
-    participant_folder = os.path.join("./participant_data", participant_data["participant_id"])
-    os.makedirs(participant_folder, exist_ok=True)
-    filename = os.path.join(participant_folder, "block2_active.csv")
-    with open(filename, "w", newline="") as file:
-        writer = csv.writer(file)
-        writer.writerow([
-            "passive_completed", "trial_number", "trial_type", "pairings", "order", "correct_answer", "response", "reaction_time"
-        ])
-        passive_completed = participant_data.get("block2_passive_completed", False)
-        for i, trial in enumerate(participant_data.get("block2_log", [])):
-            # Pairings: list of all pairs for this trial (if available)
-            pairings = trial.get("pairings", "")
-            # Order: order of tones (image+tone) or shapes (audio+image)
-            order = trial.get("tones_order", "")
-            writer.writerow([
-                passive_completed,
-                trial.get("trial_index", i),
-                trial.get("trial_type", ""),
-                pairings,
-                order,
-                trial.get("correct_answer", ""),
-                trial.get("response", ""),
-                trial.get("reaction_time", "")
-            ])
-
-def save_block4_test():
-    """Save Block 4 test data as block4_test.csv."""
-    participant_folder = os.path.join("./participant_data", participant_data["participant_id"])
-    os.makedirs(participant_folder, exist_ok=True)
-    filename = os.path.join(participant_folder, "block4_test.csv")
-    with open(filename, "w", newline="") as file:
-        writer = csv.writer(file)
-        writer.writerow([
-            "trial_number", "trial_type", "pairings", "order", "correct_answer", "response", "reaction_time"
-        ])
-        for i, trial in enumerate(participant_data.get("block_4_log", [])):
-            pairings = trial.get("pairings", "")
-            order = trial.get("tones_order", "")
-            writer.writerow([
-                trial.get("trial_index", i),
-                trial.get("trial_type", ""),
-                pairings,
-                order,
-                trial.get("correct_answer", ""),
-                trial.get("response", ""),
-                trial.get("reaction_time", "")
-            ])
-
 # Define the main menu function before it is called
 def main_menu():
     """Display the main menu and return the user's choice."""
@@ -1283,13 +1247,15 @@ def block3_free_pairings_test():
     mouse = event.Mouse(visible=True)
     
     # Instructions for second free pairing block
-    show_instructions(
+    instr_result = show_instructions(
         "On the next screen, you’ll see a list of shapes and a list of sounds.\n"
         "Click a musical note to hear its sound,\n"
         "then click the shape you think goes best with that sound.\n\n"
         "Press SPACEBAR to continue.",
         ["space"]
     )
+    if instr_result == "s":
+        return "skip"
     
     while True:
         for shape in shapes:
@@ -1326,9 +1292,11 @@ def block3_free_pairings_test():
                         break
             while any(mouse.getPressed()):
                 core.wait(0.01)
-        keys = event.getKeys()
+        keys = event.getKeys(keyList=["escape", "space", "s"])
         if "escape" in keys:
             win.close(); core.quit()
+        elif "s" in keys:
+            return "skip"
         elif "space" in keys and all("paired_shape" in t for t in tones):
             break
     
@@ -1360,36 +1328,107 @@ except Exception as e:
 # --- Enforce workflow order ---
 
 # Block 1: Free pairings with train data
-block1_free_pairings_train()
-save_block1_pairings()
+result = block1_free_pairings_train()
+if result == "skip":
+    # Skip to block 3
+    block3_free_pairings_test()
+    save_free_pairings_test_to_excel()
+    block4_testing()
+    participant_data["block_completed"] = True
+    result = "done"
+    save_block4_to_excel()
+    if result == "done":
+        show_end_screen()
+    save_block2_to_excel()
+    save_block4_to_excel()
+    win.close()
+    core.quit()
 participant_data["block_completed"] = True  # Mark block as completed
 
 # Block 2: Active or passive learning
 choice = main_menu()
 if choice == "1":
     result = block2_passive()
+    if result == "skip":
+        # Skip to block 3
+        block3_free_pairings_test()
+        save_free_pairings_test_to_excel()
+        block4_testing()
+        participant_data["block_completed"] = True
+        result = "done"
+        save_block4_to_excel()
+        if result == "done":
+            show_end_screen()
+        save_block2_to_excel()
+        save_block4_to_excel()
+        win.close()
+        core.quit()
     participant_data["block_completed"] = True
     # After passive, always do active as well
     result = block2_active()
+    if result == "skip":
+        # Skip to block 3
+        block3_free_pairings_test()
+        save_free_pairings_test_to_excel()
+        block4_testing()
+        participant_data["block_completed"] = True
+        result = "done"
+        save_block4_to_excel()
+        if result == "done":
+            show_end_screen()
+        save_block2_to_excel()
+        save_block4_to_excel()
+        win.close()
+        core.quit()
     participant_data["block_completed"] = True
 elif choice == "2":
     result = block2_active()
+    if result == "skip":
+        # Skip to block 3
+        block3_free_pairings_test()
+        save_free_pairings_test_to_excel()
+        block4_testing()
+        participant_data["block_completed"] = True
+        result = "done"
+        save_block4_to_excel()
+        if result == "done":
+            show_end_screen()
+        save_block2_to_excel()
+        save_block4_to_excel()
+        win.close()
+        core.quit()
     participant_data["block_completed"] = True
 else:
     result = None
-save_block2_active()
 save_block2_to_excel()
 
 # Block 3: Free pairings with test data
-block3_free_pairings_test()
-save_block3_pairings()
+result = block3_free_pairings_test()
+if result == "skip":
+    # Skip to block 4
+    block4_testing()
+    participant_data["block_completed"] = True
+    result = "done"
+    save_block4_to_excel()
+    if result == "done":
+        show_end_screen()
+    save_block2_to_excel()
+    save_block4_to_excel()
+    win.close()
+    core.quit()
 save_free_pairings_test_to_excel()  # <-- Save second free pairings here
 
 # Block 4: Testing block
-block4_testing()
+result = block4_testing()
+if result == "skip":
+    show_end_screen()
+    save_block2_to_excel()
+    save_block4_to_excel()
+    win.close()
+    core.quit()
 participant_data["block_completed"] = True
 result = "done"
-save_block_4_to_excel()
+save_block4_to_excel()
 
 # --- End workflow ---
 
@@ -1399,8 +1438,7 @@ if result == "done":
 
 # Save data after each block
 save_block2_to_excel()
-save_block2_active()
-save_block_4_to_excel()
+save_block4_to_excel()
 
 
 # Cleanup
