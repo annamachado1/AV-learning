@@ -564,6 +564,8 @@ def block2_active():
                     elif keys:
                         response = keys[0]
                         break
+                    core.wait(0.01)
+
                 if response is None:
                     response = "NA"
                 reaction_time = round(trial_clock.getTime(), 3)
@@ -623,6 +625,8 @@ def block2_active():
                     elif keys:
                         response = keys[0]
                         break
+                    core.wait(0.01)
+
                 if response is None:
                     response = "NA"
                 reaction_time = round(trial_clock.getTime(), 3)
@@ -845,6 +849,7 @@ def block4_testing():
                     elif keys:
                         response = keys[0]
                         break
+                    core.wait(0.01)
                     #win.flip()  # <--- safely redraw to keep the OS happy
 
                 if response is None:
@@ -892,6 +897,7 @@ def block4_testing():
                     elif keys:
                         response = keys[0]
                         break
+                    core.wait(0.01)
 
                 if response is None:
                     response = "NA"
@@ -1096,6 +1102,8 @@ def block_two_subblock(subblock, trials):
                 elif keys:
                     response = keys[0]
                     break
+                core.wait(0.01)
+
             if response is None:
                 response = "NA"
             reaction_time = round(trial_clock.getTime(), 3)
@@ -1143,7 +1151,7 @@ def block_two_subblock(subblock, trials):
             progress_bg.draw()
             progress_bar.draw()
             win.flip()
-            available_tones = [f"sound_{i:02d}.wav" for i in range(1, 7) if f"sound_{i:02d}.wav" != audio_file]
+            available_tones = [f"sound_{i:02d}.wav" for i in range(1, 7) if f"sound_{i:02d}.wav" != audio_afile]
             incorrect_tone = random.choice(available_tones)
             tones = [audio_file, incorrect_tone]
             random.shuffle(tones)
@@ -1157,6 +1165,7 @@ def block_two_subblock(subblock, trials):
                 elif keys:
                     response = keys[0]
                     break
+                core.wait(0.01)
 
             reaction_time = round(trial_clock.getTime(), 3)
             # Use correct_sound logic
