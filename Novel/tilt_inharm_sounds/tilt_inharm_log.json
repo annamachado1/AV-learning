@@ -1,0 +1,50 @@
+[
+  {
+    "file": "tilt_inharm_01.wav",
+    "F0_Hz": 196,
+    "harmonics": 12,
+    "spectral_tilt_beta": 0.3,
+    "inharmonicity": 0.0,
+    "spectral_centroid_Hz": 968.0746726409863
+  },
+  {
+    "file": "tilt_inharm_02.wav",
+    "F0_Hz": 196,
+    "harmonics": 12,
+    "spectral_tilt_beta": 1.0,
+    "inharmonicity": 0.01,
+    "spectral_centroid_Hz": 392.4815335703107
+  },
+  {
+    "file": "tilt_inharm_03.wav",
+    "F0_Hz": 196,
+    "harmonics": 12,
+    "spectral_tilt_beta": 1.3,
+    "inharmonicity": 0.02,
+    "spectral_centroid_Hz": 296.4101404648888
+  },
+  {
+    "file": "tilt_inharm_04.wav",
+    "F0_Hz": 196,
+    "harmonics": 12,
+    "spectral_tilt_beta": 1.7,
+    "inharmonicity": 0.03,
+    "spectral_centroid_Hz": 241.75215775218433
+  },
+  {
+    "file": "tilt_inharm_05.wav",
+    "F0_Hz": 196,
+    "harmonics": 12,
+    "spectral_tilt_beta": 2.1,
+    "inharmonicity": 0.04,
+    "spectral_centroid_Hz": 222.009959472424
+  },
+  {
+    "file": "tilt_inharm_06.wav",
+    "F0_Hz": 196,
+    "harmonics": 12,
+    "spectral_tilt_beta": 2.5,
+    "inharmonicity": 0.05,
+    "spectral_centroid_Hz": 214.7702735403081
+  }
+]
