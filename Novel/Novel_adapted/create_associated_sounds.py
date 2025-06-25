@@ -10,7 +10,7 @@ SR = 44100
 DUR = 1.2
 F0 = 130.81
 N_HARM = 12
-OUT_DIR = "associated_generated_sounds"
+OUT_DIR = "generated_associated_sounds"
 VOLUME = 0.9
 T = np.linspace(0, DUR, int(SR * DUR), endpoint=False)
 
@@ -82,7 +82,7 @@ for idx, (formant, timbre) in enumerate(zip(formant_profiles, timbre_profiles), 
     sig /= np.max(np.abs(sig)) / VOLUME
     wav = np.int16(sig * 32767)
 
-    fname = f"associated_sound_{idx:02d}_{f_label}_{t_label}.wav"
+    fname = f"associated_sound_{idx:02d}.wav"
     write(os.path.join(OUT_DIR, fname), SR, wav)
     print("Saved", fname)
 
