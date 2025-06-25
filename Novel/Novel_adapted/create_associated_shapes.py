@@ -3,10 +3,13 @@ import matplotlib.pyplot as plt
 import os
 import json
 from scipy.interpolate import CubicSpline  # Replace interp1d
+import pandas as pd
 
 # ---------------- SETTINGS -----------------
 SAVE_DIR = "generated_associated_shapes"
 os.makedirs(SAVE_DIR, exist_ok=True)
+
+RANDOM_SEED = 42  # <<<<<<<< Add this line for reproducibility
 
 n_shapes = 6
 image_size = 4
@@ -43,6 +46,8 @@ def generate_blob(n_lobes, amp, seed=None):
     return x, y
 
 # ------------ MAIN LOOP -------------
+shape_data = []  # Collect all shape info here
+
 for i, p in enumerate(shape_params):
     shape_json = os.path.join(SAVE_DIR, f"shape_{i+1:02d}.json")
 
@@ -54,7 +59,8 @@ for i, p in enumerate(shape_params):
         y = np.array(data["y"])
     else:
         # Generate new random shape
-        x, y = generate_blob(p["lobes"], p["amp"])
+        # Use a different seed for each shape for diversity, but deterministic
+        x, y = generate_blob(p["lobes"], p["amp"], seed=RANDOM_SEED + i)
         if FREEZE:
             with open(shape_json, "w") as f:
                 json.dump({"x": x.tolist(), "y": y.tolist()}, f)
@@ -67,8 +73,22 @@ for i, p in enumerate(shape_params):
     ax.set_xlim(-2, 2)
     ax.set_ylim(-2, 2)
 
-    fname = f"shape_{i+1:02d}.png"
+    fname = f"associated_shape_{i+1:02d}.png"
     fig.savefig(os.path.join(SAVE_DIR, fname), transparent=False, facecolor='white')
     plt.close(fig)
 
+    # Collect summary info for Excel
+    shape_data.append({
+        "shape_index": i+1,
+        "lobes": p["lobes"],
+        "amp": p["amp"],
+        "image_file": f"associated_shape_{i+1:02d}.png"
+    })
+
+# Save summary Excel file
+excel_path = os.path.join(SAVE_DIR, "associated_shapes_summary.xlsx")
+df = pd.DataFrame(shape_data)
+df.to_excel(excel_path, index=False)
+
 print(f"✅ Shapes {'loaded' if FREEZE else 'generated'} and saved in '{SAVE_DIR}'")
+print(f"📄 Excel summary saved at '{excel_path}'")

@@ -173,7 +173,7 @@ def block1_crossmodal():
     print("Starting Block 1 Crossmodal...")
 
     instruction_result = show_instructions(
-        "Block 1 Task Instructions: \n\n"
+        "Task Instructions: \n\n"
         "You will be presented with a shape and two sounds.\n"
         "Press '1' if the first sound matches the shape, '2' if the second sound matches the shape. \n"
         "You will receive feedback after each response.\n\n"
@@ -357,7 +357,7 @@ def block1_crossmodal():
 
         end_msg = visual.TextStim(
             win,
-            text="You have completed Block 1.\n\nPress SPACEBAR to continue.",
+            text="You have completed this block.\n\nPress SPACEBAR to continue.",
             color="lightgrey", height=0.06, pos=(0, 0)
         )
         end_msg.draw()
@@ -384,10 +384,10 @@ def block2_unimodal():
     print("Starting Block 2 Unimodal...")
 
     instruction_result = show_instructions(
-        "Block 2 Task Instructions: \n\n"
+        "Task Instructions: \n\n"
         "You will complete two types of trials:\n"
         "1. Visual only: You will see a shape twice, each time with a different pairing.\n"
-        "2. Auditory only: You will hear two sounds in sequence, each from a different set, one is correct, one is not.\n"
+        "2. Auditory only: You will hear two sounds in sequence, one is correct, one is not.\n"
         "For each, press '1' if the first matches, '2' if the second matches.\n"
         "You will receive feedback after each response.\n\n"
         "Press SPACEBAR to continue.",
@@ -623,7 +623,7 @@ def block2_unimodal():
 
     end_msg = visual.TextStim(
         win,
-        text="You have completed Block 2.\n\nPress SPACEBAR to continue.",
+        text="You have completed this block.\n\nPress SPACEBAR to continue.",
         color="lightgrey", height=0.06, pos=(0, 0)
     )
     end_msg.draw()
@@ -643,13 +643,8 @@ def block3_testing():
 
     instruction_result = show_instructions(
         "Block 3 Instructions: \n\n"
-        "You will either:\n"
-        "1. see one shape and hear two different sounds (shape+2sounds trial) or\n"
-        "2. hear one sound and see two different shapes (sound+2shapes trial).\n\n"
-        "For shape+2sounds trials, press '1' if the first sound matches the shape, '2' if the second sound matches. \n"
-        "For sound+2shapes trials, press '1' if the first shape matches the sound, '2' if the second shape matches.\n\n"
-        "Please wait until prompted to press the keys.\n"
-        "You will NOT receive feedback after each trial.\n\n"
+        "x"
+        "You will NOT receive feedback.\n\n"
         "Press SPACEBAR to continue.",
         ["space"]
     )

@@ -1,14 +1,16 @@
 import numpy as np
 from scipy.io.wavfile import write
 from scipy.signal import butter, sosfilt, welch
-import os, json, pandas as pd
+import os, pandas as pd
 
 # ----------------- GLOBALS -----------------
+np.random.seed(42)  # Set random seed for reproducibility
+
 SR = 44100
 DUR = 1.2
 F0 = 130.81
 N_HARM = 12
-OUT_DIR = "incremental_formant_timbre_sounds"
+OUT_DIR = "associated_generated_sounds"
 VOLUME = 0.9
 T = np.linspace(0, DUR, int(SR * DUR), endpoint=False)
 
@@ -80,7 +82,7 @@ for idx, (formant, timbre) in enumerate(zip(formant_profiles, timbre_profiles), 
     sig /= np.max(np.abs(sig)) / VOLUME
     wav = np.int16(sig * 32767)
 
-    fname = f"sound_{idx:02d}_{f_label}_{t_label}.wav"
+    fname = f"associated_sound_{idx:02d}_{f_label}_{t_label}.wav"
     write(os.path.join(OUT_DIR, fname), SR, wav)
     print("Saved", fname)
 
@@ -96,8 +98,8 @@ for idx, (formant, timbre) in enumerate(zip(formant_profiles, timbre_profiles), 
     })
 
 # ---------------- LOGGING ----------------
-pd.DataFrame(log).to_csv(os.path.join(OUT_DIR, "log.csv"), index=False)
-with open(os.path.join(OUT_DIR, "log.json"), "w") as f:
-    json.dump(log, f, indent=2)
+df = pd.DataFrame(log)
+df.to_csv(os.path.join(OUT_DIR, "log.csv"), index=False)
+df.to_excel(os.path.join(OUT_DIR, "log.xlsx"), index=False)  # Save as Excel spreadsheet
 
 print(f"\nFinished – {len(log)} incremental formant+timbre variants saved in '{OUT_DIR}'")
