@@ -190,7 +190,8 @@ def block1_crossmodal():
         print("Entering trial loop for Block 1 Crossmodal...")
         local_stimuli = list(stimuli_pairs)
         random.shuffle(local_stimuli)
-        crossmodal_trials = local_stimuli * 33  # 6 pairs × 33 = 198 trials
+        crossmodal_trials = local_stimuli * 23  # 6 pairs × 23 = 138 trials (approx 14 min)
+        crossmodal_trials = crossmodal_trials[:140]  # Cap at 140 trials
         random.shuffle(crossmodal_trials)
 
         correct_feedback = visual.ImageStim(win, image="green_tick.png", size=(0.2, 0.2), pos=(0, 0))
@@ -232,7 +233,7 @@ def block1_crossmodal():
 
         progress_bar = create_progress_bar(progress_value)
 
-        TRIALS_BEFORE_BREAK = 33
+        TRIALS_BEFORE_BREAK = 35  # Break every 35 trials
         total_trials = len(crossmodal_trials)
 
         fixation = visual.TextStim(win, text="+", color="lightgrey", height=0.1, pos=(0, 0))
@@ -408,7 +409,8 @@ def block2_unimodal():
     for v, a in zip(visual_trials, auditory_trials):
         unimodal_trials.append(("visual", v[0], v[1]))
         unimodal_trials.append(("auditory", a[0], a[1]))
-    unimodal_trials = unimodal_trials * 33  # 6 pairs × 2 × 33 = 396 trials
+    unimodal_trials = unimodal_trials * 12  # 6 pairs × 2 × 12 = 144 trials
+    unimodal_trials = unimodal_trials[:140]  # Cap at 140 trials
     random.shuffle(unimodal_trials)
 
     # Preload images
@@ -462,7 +464,7 @@ def block2_unimodal():
         )
 
     progress_bar = create_progress_bar(progress_value)
-    TRIALS_BEFORE_BREAK = 33
+    TRIALS_BEFORE_BREAK = 35  # Break every 35 trials
 
     fixation = visual.TextStim(win, text="+", color="lightgrey", height=0.1, pos=(0, 0))
     prompt_visual = visual.TextStim(win, text="Press 1 if FIRST shape matches; 2 if SECOND shape matches.",
@@ -643,7 +645,11 @@ def block3_testing():
 
     instruction_result = show_instructions(
         "Block 3 Instructions: \n\n"
-        "x"
+        "You will complete four types of trials:\n"
+        "1. Visual cue: See a shape, then hear two sounds. Press 1 if the FIRST sound matches, 2 if the SECOND matches.\n"
+        "2. Auditory cue: Hear a sound, then see two shapes. Press 1 if the FIRST shape matches, 2 if the SECOND matches.\n"
+        "3. Auditory only: Hear a sound, then hear two sounds. Press 1 if the FIRST matches, 2 if the SECOND matches.\n"
+        "4. Visual only: See a shape, then see two shapes. Press 1 if the FIRST matches, 2 if the SECOND matches.\n"
         "You will NOT receive feedback.\n\n"
         "Press SPACEBAR to continue.",
         ["space"]
@@ -652,11 +658,57 @@ def block3_testing():
         return "skip"
 
     try:
-        active_trials = test_pairs * 33
-        random.shuffle(active_trials)
+        # Prepare all trial types for each pair
+        test_shape_files = [p[0] for p in test_pairs]
+        test_sound_files = [p[1] for p in test_pairs]
+        pair_dict = dict(test_pairs)
+        inv_pair_dict = {v: k for k, v in test_pairs}
 
-        # Setup progress bar
-        total_trials = len(active_trials)
+        # For each pair, create all four trial types
+        all_trials = []
+        for shape, sound in test_pairs:
+            # Find incongruent shape/sound
+            incongruent_shapes = [s for s in test_shape_files if s != shape]
+            incongruent_sounds = [s for s in test_sound_files if s != sound]
+            incongruent_shape = random.choice(incongruent_shapes)
+            incongruent_sound = random.choice(incongruent_sounds)
+
+            # Visual cue (shape, then two sounds)
+            all_trials.append({
+                "trial_type": "visual_cue",
+                "cue": shape,
+                "congruent": sound,
+                "incongruent": incongruent_sound
+            })
+            # Auditory cue (sound, then two shapes)
+            all_trials.append({
+                "trial_type": "auditory_cue",
+                "cue": sound,
+                "congruent": shape,
+                "incongruent": incongruent_shape
+            })
+            # Auditory only (sound, then two sounds)
+            all_trials.append({
+                "trial_type": "auditory_only",
+                "cue": sound,
+                "congruent": sound,
+                "incongruent": incongruent_sound
+            })
+            # Visual only (shape, then two shapes)
+            all_trials.append({
+                "trial_type": "visual_only",
+                "cue": shape,
+                "congruent": shape,
+                "incongruent": incongruent_shape
+            })
+
+        # Repeat and shuffle
+        all_trials = all_trials * 10  # 24 unique × 10 = 240 trials
+        all_trials = all_trials[:240]  # Cap at 240 trials
+        random.shuffle(all_trials)
+        total_trials = len(all_trials)
+
+        # Progress bar setup
         progress_value = 0.0
         bar_width = 0.5
         bar_height = 0.07
@@ -693,13 +745,15 @@ def block3_testing():
 
         # Reusable stimuli
         fixation = visual.TextStim(win, text="+", color="lightgrey", height=0.1, pos=(0, 0))
-        prompt_shape2 = visual.TextStim(win, text="Press 1 if FIRST shape matches; 2 if SECOND shape matches.",
-                                        color="white", height=0.05, pos=(0, 0))
         prompt_sound2 = visual.TextStim(win, text="Press 1 if FIRST sound matches; 2 if SECOND sound matches.",
+                                        color="white", height=0.05, pos=(0, 0))
+        prompt_shape2 = visual.TextStim(win, text="Press 1 if FIRST shape matches; 2 if SECOND shape matches.",
                                         color="white", height=0.05, pos=(0, 0))
         img_stim = visual.ImageStim(win, image=None, size=(0.3, 0.4), pos=(0, 0))
 
-        for trial_index, (img_file, audio_file) in enumerate(active_trials):
+        TRIALS_BEFORE_BREAK = 60  # Break every 60 trials (~4 breaks)
+
+        for trial_index, trial in enumerate(all_trials):
             if "escape" in event.getKeys():
                 win.close()
                 core.quit()
@@ -707,38 +761,42 @@ def block3_testing():
                 return "skip"
 
             trial_clock = core.Clock()
-            trial_type = random.choice(["sound+2shapes", "shape+2sounds"])
-            tones = None
-            correct_answer = None
             response = None
+            correct_answer = None
+            order = None
 
-            correct_sound = dict(test_pairs).get(img_file)
-            correct_shape = {v: k for k, v in test_pairs}.get(audio_file)
+            # --- Fixation ---
+            fixation.draw()
+            progress_bg.draw()
+            progress_bar.draw()
+            win.flip()
+            core.wait(0.5)
 
-            # Shape+2sounds
-            if trial_type == "shape+2sounds":
-                image_path = os.path.join(test_image_dir, img_file)
-                available_tones = [snd for snd in test_sound_files if snd != audio_file]
-                incorrect_tone = random.choice(available_tones)
-                tones = [audio_file, incorrect_tone]
-                random.shuffle(tones)
+            # --- Trial logic ---
+            if trial["trial_type"] == "visual_cue":
+                # Show shape, then play two sounds (congruent/incongruent, random order)
+                img_stim.image = os.path.join(test_image_dir, trial["cue"])
+                img_stim.draw()
+                progress_bg.draw()
+                progress_bar.draw()
+                win.flip()
+                core.wait(1.0)
+
+                sounds = [trial["congruent"], trial["incongruent"]]
+                random.shuffle(sounds)
+                order = sounds
 
                 for i in range(2):
-                    fixation.draw()
-                    progress_bg.draw()
-                    progress_bar.draw()
-                    win.flip()
-                    core.wait(0.5)
-
-                    img_stim.image = image_path
-                    img_stim.draw()
-                    progress_bg.draw()
-                    progress_bar.draw()
-                    win.flip()
-                    core.wait(0.5)
-
-                    test_sounds[tones[i]].play()
+                    test_sounds[sounds[i]].play()
                     core.wait(1.0)
+                    if i == 0:
+                        fixation.draw()
+                        progress_bg.draw()
+                        progress_bar.draw()
+                        win.flip()
+                        core.wait(0.5)
+                    else:
+                        core.wait(0.5)
 
                 prompt_sound2.draw()
                 progress_bg.draw()
@@ -746,8 +804,7 @@ def block3_testing():
                 win.flip()
                 trial_clock.reset()
 
-                timer = core.Clock()
-                while timer.getTime() < 5:
+                while trial_clock.getTime() < 5:
                     keys = event.getKeys(keyList=["1", "2", "escape", "s"])
                     if "escape" in keys:
                         win.close(); core.quit()
@@ -757,36 +814,35 @@ def block3_testing():
                         response = keys[0]
                         break
                     core.wait(0.01)
-
                 if response is None:
                     response = "NA"
-
                 reaction_time = round(trial_clock.getTime(), 3)
-                correct_answer = "1" if tones[0] == correct_sound else "2"
+                correct_answer = "1" if sounds[0] == trial["congruent"] else "2"
 
-            # Sound+2shapes
-            elif trial_type == "sound+2shapes":
-                available_images = [shp for shp in test_shape_files if shp != img_file]
-                distractor = random.choice(available_images)
-                images = [img_file, distractor]
-                random.shuffle(images)
+            elif trial["trial_type"] == "auditory_cue":
+                # Play sound, then show two shapes (congruent/incongruent, random order)
+                test_sounds[trial["cue"]].play()
+                core.wait(1.0)
+
+                shapes = [trial["congruent"], trial["incongruent"]]
+                random.shuffle(shapes)
+                order = shapes
 
                 for i in range(2):
-                    fixation.draw()
-                    progress_bg.draw()
-                    progress_bar.draw()
-                    win.flip()
-                    core.wait(0.5)
-
-                    img_stim.image = os.path.join(test_image_dir, images[i])
+                    img_stim.image = os.path.join(test_image_dir, shapes[i])
                     img_stim.draw()
                     progress_bg.draw()
                     progress_bar.draw()
                     win.flip()
-                    core.wait(0.5)
-
-                    test_sounds[audio_file].play()
                     core.wait(1.0)
+                    if i == 0:
+                        fixation.draw()
+                        progress_bg.draw()
+                        progress_bar.draw()
+                        win.flip()
+                        core.wait(0.5)
+                    else:
+                        core.wait(0.5)
 
                 prompt_shape2.draw()
                 progress_bg.draw()
@@ -804,26 +860,115 @@ def block3_testing():
                         response = keys[0]
                         break
                     core.wait(0.01)
-
                 if response is None:
                     response = "NA"
-
                 reaction_time = round(trial_clock.getTime(), 3)
-                correct_answer = "1" if images[0] == correct_shape else "2"
+                correct_answer = "1" if shapes[0] == trial["congruent"] else "2"
+
+            elif trial["trial_type"] == "auditory_only":
+                # Play sound, then play two sounds (congruent/incongruent, random order)
+                test_sounds[trial["cue"]].play()
+                core.wait(1.0)
+
+                sounds = [trial["congruent"], trial["incongruent"]]
+                random.shuffle(sounds)
+                order = sounds
+
+                for i in range(2):
+                    test_sounds[sounds[i]].play()
+                    core.wait(1.0)
+                    if i == 0:
+                        fixation.draw()
+                        progress_bg.draw()
+                        progress_bar.draw()
+                        win.flip()
+                        core.wait(0.5)
+                    else:
+                        core.wait(0.5)
+
+                prompt_sound2.draw()
+                progress_bg.draw()
+                progress_bar.draw()
+                win.flip()
+                trial_clock.reset()
+
+                while trial_clock.getTime() < 5:
+                    keys = event.getKeys(keyList=["1", "2", "escape", "s"])
+                    if "escape" in keys:
+                        win.close(); core.quit()
+                    elif "s" in keys:
+                        return "skip"
+                    elif keys:
+                        response = keys[0]
+                        break
+                    core.wait(0.01)
+                if response is None:
+                    response = "NA"
+                reaction_time = round(trial_clock.getTime(), 3)
+                correct_answer = "1" if sounds[0] == trial["congruent"] else "2"
+
+            elif trial["trial_type"] == "visual_only":
+                # Show shape, then show two shapes (congruent/incongruent, random order)
+                img_stim.image = os.path.join(test_image_dir, trial["cue"])
+                img_stim.draw()
+                progress_bg.draw()
+                progress_bar.draw()
+                win.flip()
+                core.wait(1.0)
+
+                shapes = [trial["congruent"], trial["incongruent"]]
+                random.shuffle(shapes)
+                order = shapes
+
+                for i in range(2):
+                    img_stim.image = os.path.join(test_image_dir, shapes[i])
+                    img_stim.draw()
+                    progress_bg.draw()
+                    progress_bar.draw()
+                    win.flip()
+                    core.wait(1.0)
+                    if i == 0:
+                        fixation.draw()
+                        progress_bg.draw()
+                        progress_bar.draw()
+                        win.flip()
+                        core.wait(0.5)
+                    else:
+                        core.wait(0.5)
+
+                prompt_shape2.draw()
+                progress_bg.draw()
+                progress_bar.draw()
+                win.flip()
+                trial_clock.reset()
+
+                while trial_clock.getTime() < 5:
+                    keys = event.getKeys(keyList=["1", "2", "escape", "s"])
+                    if "escape" in keys:
+                        win.close(); core.quit()
+                    elif "s" in keys:
+                        return "skip"
+                    elif keys:
+                        response = keys[0]
+                        break
+                    core.wait(0.01)
+                if response is None:
+                    response = "NA"
+                reaction_time = round(trial_clock.getTime(), 3)
+                correct_answer = "1" if shapes[0] == trial["congruent"] else "2"
 
             # Log results
             participant_data["reaction time"].append(reaction_time)
             trial_data = {
                 "trial_index": trial_index,
-                "trial_type": trial_type,
-                "stimulus": img_file,
-                "audio": audio_file,
-                "tones_order": tones if trial_type == "shape+2sounds" else "N/A",
+                "trial_type": trial["trial_type"],
+                "cue": trial["cue"],
+                "congruent": trial["congruent"],
+                "incongruent": trial["incongruent"],
+                "order": order,
                 "correct_answer": correct_answer,
                 "response": response,
                 "reaction_time": reaction_time,
-                "pairings": list(test_pairs),
-                "order": tones if trial_type == "shape+2sounds" else images if trial_type == "sound+2shapes" else "N/A",
             }
             participant_data["block3_test_log"].append(trial_data)
 
@@ -831,8 +976,8 @@ def block3_testing():
             progress_value += 1.0 / total_trials
             progress_bar = create_progress_bar(progress_value)
 
-            # Break every N trials
-            if (trial_index + 1) % 33 == 0 and (trial_index + 1) < total_trials:
+            # Break every 60 trials
+            if (trial_index + 1) % TRIALS_BEFORE_BREAK == 0 and (trial_index + 1) < total_trials:
                 break_msg = visual.TextStim(win, text="You may take a short break.\n\nPress SPACEBAR to continue.",
                                             color="lightgrey", height=0.06, pos=(0, 0))
                 break_msg.draw()
