@@ -27,11 +27,17 @@ participant_data = {
     "task order": "",
     "time on active task": 0,
     "click data": {},
+    "block 1 correct": 0,      # <-- Add this line
+    "block 1 incorrect": 0,    # <-- Add this line
     "block 2 correct": 0,
     "block 2 incorrect": 0,
     "reaction time": [],
     "block 2 log": [],
 }
+
+# === Presentation timing constants ===
+STIMULUS_DURATION = 1.0  # seconds, set this to your desired uniform duration
+FIXATION_DURATION = 0.5  # seconds, all fixations when stimuli aren't present
 
 # Generate ordered list of paired stimuli (shape_01.png with sound_01.wav, etc.)
 stimuli_pairs = [
@@ -190,8 +196,8 @@ def block1_crossmodal():
         print("Entering trial loop for Block 1 Crossmodal...")
         local_stimuli = list(stimuli_pairs)
         random.shuffle(local_stimuli)
-        crossmodal_trials = local_stimuli * 23  # 6 pairs × 23 = 138 trials (approx 14 min)
-        crossmodal_trials = crossmodal_trials[:140]  # Cap at 140 trials
+        crossmodal_trials = local_stimuli * 20  # 6 pairs × 20 = 120, will trim below
+        crossmodal_trials = crossmodal_trials[:120]  # Exactly 120 trials
         random.shuffle(crossmodal_trials)
 
         correct_feedback = visual.ImageStim(win, image="green_tick.png", size=(0.2, 0.2), pos=(0, 0))
@@ -261,10 +267,10 @@ def block1_crossmodal():
             progress_bg.draw()
             progress_bar.draw()
             win.flip()
-            core.wait(0.5)
+            core.wait(FIXATION_DURATION)
             # -------------------------------------
 
-            # Show the same image twice, each for 1.5s, with each tone
+            # Show the same image twice, each for 1.0s, with each tone
             for i in range(2):
                 img_stim.image = image_path
                 img_stim.draw()
@@ -273,15 +279,15 @@ def block1_crossmodal():
                 win.flip()
                 tone = main_sounds[tones[i]]  # Use preloaded sound
                 tone.play()
-                core.wait(1.0)
+                core.wait(STIMULUS_DURATION)  # unified duration for sound
                 if i == 0:
                     fixation.draw()
                     progress_bg.draw()
                     progress_bar.draw()
                     win.flip()
-                    core.wait(0.5)
+                    core.wait(FIXATION_DURATION)
                 else:
-                    core.wait(0.5)
+                    core.wait(FIXATION_DURATION)
 
             prompt_sound2.draw()
             progress_bg.draw()
@@ -404,19 +410,21 @@ def block2_unimodal():
     visual_trials = visual_shape_pairs
     auditory_trials = auditory_sound_pairs
 
-    # Interleave visual and auditory trials
-    unimodal_trials = []
-    for v, a in zip(visual_trials, auditory_trials):
-        unimodal_trials.append(("visual", v[0], v[1]))
-        unimodal_trials.append(("auditory", a[0], a[1]))
-    unimodal_trials = unimodal_trials * 12  # 6 pairs × 2 × 12 = 144 trials
-    unimodal_trials = unimodal_trials[:140]  # Cap at 140 trials
+    # Create 120 visual-only and 120 auditory-only trials
+    visual_only_trials = [("visual", v[0], v[1]) for v in visual_trials] * 20  # 6 × 20 = 120
+    visual_only_trials = visual_only_trials[:120]
+    auditory_only_trials = [("auditory", a[0], a[1]) for a in auditory_trials] * 20  # 6 × 20 = 120
+    auditory_only_trials = auditory_only_trials[:120]
+
+    # Interleave by shuffling the combined list
+    unimodal_trials = visual_only_trials + auditory_only_trials  # 240 trials
     random.shuffle(unimodal_trials)
 
     # Preload images
-    shape_files = [v[0] for v in visual_trials] + [v[1] for v in visual_trials]
+    shape_files = [v[0] for v in visual_trials]
+    associated_shape_files = [v[1] for v in visual_trials]
     preloaded_shapes = preload_images("./generated_shapes", shape_files)
-    preloaded_associated = preload_images("./generated_associated_shapes", shape_files)
+    preloaded_associated = preload_images("./generated_associated_shapes", associated_shape_files)
 
     # Preload both sets of sounds for auditory-only trials
     auditory_first_files = [a[0] for a in auditory_trials]
@@ -492,12 +500,13 @@ def block2_unimodal():
         progress_bg.draw()
         progress_bar.draw()
         win.flip()
-        core.wait(0.5)
+        core.wait(FIXATION_DURATION)
 
         if trial_type == "visual":
             # Show the same shape twice, once with correct associated, once with distractor
             shape_file, associated_shape_file = trial[1], trial[2]
-            distractors = [f for f in shape_files if f != associated_shape_file]
+            # Use only associated_shape_files for distractors
+            distractors = [f for f in associated_shape_files if f != associated_shape_file]
             distractor = random.choice(distractors)
             images = [associated_shape_file, distractor]
             random.shuffle(images)
@@ -508,15 +517,15 @@ def block2_unimodal():
                 progress_bg.draw()
                 progress_bar.draw()
                 win.flip()
-                core.wait(1.0)
+                core.wait(STIMULUS_DURATION)  # unified duration
                 if i == 0:
                     fixation.draw()
                     progress_bg.draw()
                     progress_bar.draw()
                     win.flip()
-                    core.wait(0.5)
+                    core.wait(FIXATION_DURATION)
                 else:
-                    core.wait(0.5)
+                    core.wait(FIXATION_DURATION)
 
             prompt_visual.draw()
             progress_bg.draw()
@@ -555,10 +564,10 @@ def block2_unimodal():
                 progress_bg.draw()
                 progress_bar.draw()
                 win.flip()
-                core.wait(0.5)
+                core.wait(FIXATION_DURATION)
                 # Play from associated sounds directory
                 preloaded_associated_sounds[sounds_pair[i]].play()
-                core.wait(1.0)
+                core.wait(STIMULUS_DURATION)  # unified duration for sound
 
             prompt_auditory.draw()
             progress_bg.draw()
@@ -737,9 +746,9 @@ def block3_testing():
                       (left_edge + bar_width, bar_y - bar_height / 2),
                       (left_edge + bar_width, bar_y + bar_height / 2),
                       (left_edge, bar_y + bar_height / 2)],
-            fillColor='darkgrey',
-            lineColor='white',
-            closeShape=True
+        fillColor='darkgrey',
+        lineColor='white',
+        closeShape=True
         )
         progress_bar = create_progress_bar(progress_value)
 
@@ -770,7 +779,7 @@ def block3_testing():
             progress_bg.draw()
             progress_bar.draw()
             win.flip()
-            core.wait(0.5)
+            core.wait(FIXATION_DURATION)
 
             # --- Trial logic ---
             if trial["trial_type"] == "visual_cue":
@@ -780,7 +789,7 @@ def block3_testing():
                 progress_bg.draw()
                 progress_bar.draw()
                 win.flip()
-                core.wait(1.0)
+                core.wait(STIMULUS_DURATION)  # unified duration
 
                 sounds = [trial["congruent"], trial["incongruent"]]
                 random.shuffle(sounds)
@@ -788,15 +797,15 @@ def block3_testing():
 
                 for i in range(2):
                     test_sounds[sounds[i]].play()
-                    core.wait(1.0)
+                    core.wait(STIMULUS_DURATION)  # unified duration for sound
                     if i == 0:
                         fixation.draw()
                         progress_bg.draw()
                         progress_bar.draw()
                         win.flip()
-                        core.wait(0.5)
+                        core.wait(FIXATION_DURATION)
                     else:
-                        core.wait(0.5)
+                        core.wait(FIXATION_DURATION)
 
                 prompt_sound2.draw()
                 progress_bg.draw()
@@ -822,7 +831,7 @@ def block3_testing():
             elif trial["trial_type"] == "auditory_cue":
                 # Play sound, then show two shapes (congruent/incongruent, random order)
                 test_sounds[trial["cue"]].play()
-                core.wait(1.0)
+                core.wait(STIMULUS_DURATION)  # unified duration for sound
 
                 shapes = [trial["congruent"], trial["incongruent"]]
                 random.shuffle(shapes)
@@ -834,15 +843,15 @@ def block3_testing():
                     progress_bg.draw()
                     progress_bar.draw()
                     win.flip()
-                    core.wait(1.0)
+                    core.wait(STIMULUS_DURATION)  # unified duration
                     if i == 0:
                         fixation.draw()
                         progress_bg.draw()
                         progress_bar.draw()
                         win.flip()
-                        core.wait(0.5)
+                        core.wait(FIXATION_DURATION)
                     else:
-                        core.wait(0.5)
+                        core.wait(FIXATION_DURATION)
 
                 prompt_shape2.draw()
                 progress_bg.draw()
@@ -868,7 +877,7 @@ def block3_testing():
             elif trial["trial_type"] == "auditory_only":
                 # Play sound, then play two sounds (congruent/incongruent, random order)
                 test_sounds[trial["cue"]].play()
-                core.wait(1.0)
+                core.wait(STIMULUS_DURATION)  # unified duration for sound
 
                 sounds = [trial["congruent"], trial["incongruent"]]
                 random.shuffle(sounds)
@@ -876,15 +885,15 @@ def block3_testing():
 
                 for i in range(2):
                     test_sounds[sounds[i]].play()
-                    core.wait(1.0)
+                    core.wait(STIMULUS_DURATION)  # unified duration for sound
                     if i == 0:
                         fixation.draw()
                         progress_bg.draw()
                         progress_bar.draw()
                         win.flip()
-                        core.wait(0.5)
+                        core.wait(FIXATION_DURATION)
                     else:
-                        core.wait(0.5)
+                        core.wait(FIXATION_DURATION)
 
                 prompt_sound2.draw()
                 progress_bg.draw()
@@ -914,7 +923,7 @@ def block3_testing():
                 progress_bg.draw()
                 progress_bar.draw()
                 win.flip()
-                core.wait(1.0)
+                core.wait(STIMULUS_DURATION)  # unified duration
 
                 shapes = [trial["congruent"], trial["incongruent"]]
                 random.shuffle(shapes)
@@ -926,15 +935,15 @@ def block3_testing():
                     progress_bg.draw()
                     progress_bar.draw()
                     win.flip()
-                    core.wait(1.0)
+                    core.wait(STIMULUS_DURATION)  # unified duration
                     if i == 0:
                         fixation.draw()
                         progress_bg.draw()
                         progress_bar.draw()
                         win.flip()
-                        core.wait(0.5)
+                        core.wait(FIXATION_DURATION)
                     else:
-                        core.wait(0.5)
+                        core.wait(FIXATION_DURATION)
 
                 prompt_shape2.draw()
                 progress_bg.draw()
@@ -1023,6 +1032,9 @@ def show_end_screen():
     event.waitKeys(keyList=["space"])  # Wait for spacebar to exit
 
 
+# === DEBUG: Skip to block 3 for debugging ===
+DEBUG_SKIP_TO_BLOCK3 = True  # Set to True to skip to block 3
+
 # === Main experiment flow ===
 participant_id = get_participant_id()
 participant_data["participant_id"] = participant_id
@@ -1035,17 +1047,25 @@ except Exception as e:
 
 # --- Counterbalanced workflow ---
 
-# Prompt for order (or use participant_id parity for automatic counterbalancing)
-order_prompt = visual.TextStim(
-    win,
-    text="Select experiment order:\n\n"
-         "Press 1 for: Block 1 (crossmodal) → Block 2 (unimodal) → Block 3 (test)\n"
-         "Press 2 for: Block 2 (unimodal) → Block 1 (crossmodal) → Block 3 (test)\n",
-    color="lightgrey", height=0.06, wrapWidth=1.6
-)
-order_prompt.draw()
-win.flip()
-order_key = event.waitKeys(keyList=["1", "2"])[0]
+if DEBUG_SKIP_TO_BLOCK3:
+    print("DEBUG: Skipping directly to block 3 (testing block).")
+    result = block3_testing()
+    if result == "skip":
+        win.close(); core.quit()
+    save_block3_test_to_excel()
+    show_end_screen()
+    save_block1_crossmodal_to_excel()
+    save_block2_unimodal_to_excel()
+    save_block3_test_to_excel()
+    win.close()
+    core.quit()
+
+# Use participant_id for automatic counterbalancing - even digiit = order 1, odd digit = order 2
+last_char = participant_id.strip()[-1] if participant_id.strip() else "0"
+if last_char.isdigit():
+    order_key = "1" if int(last_char) % 2 == 0 else "2"
+else:
+    order_key = "1"  # Default to order 1 if no digit
 participant_data["order"] = order_key
 
 if order_key == "1":
