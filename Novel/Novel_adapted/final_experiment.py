@@ -120,7 +120,7 @@ def show_practice_feedback(win, correct):
     feedback = visual.ImageStim(win, image=img_path, size=(0.2, 0.2))
     feedback.draw()
     win.flip()
-    core.wait(1.0)
+    core.wait(0.3)  # changed from 1.0 to 0.3
 
 def show_practice_visual(win, img_path, with_border=False):
     img = visual.ImageStim(win, image=img_path, size=(0.3, 0.4), units="norm")
@@ -162,10 +162,10 @@ def prompt_practice_response(win, text="Press 1 for FIRST, 2 for SECOND."):
     return "NA"
 
 def run_av_practice(win, stimuli):
-    wait_for_space(win, "Crossmodal Trial: Press SPACE to begin.")
+    wait_for_space(win, "Mixed Trial: Press SPACE to begin.")
     
     show_practice_visual_until_space(win, stimuli["visual"]["target"], with_border=True)
-    wait_for_space(win, "This is the target shape.\n\nPress SPACE to hear the sounds.")
+    wait_for_space(win, "This is the target shape.")
     show_practice_fixation(win)
 
     options = [stimuli["audio"]["target"], stimuli["audio"]["distractor"]]
@@ -181,10 +181,10 @@ def run_av_practice(win, stimuli):
     show_practice_feedback(win, response == correct)
 
 def run_aa_practice(win, stimuli):
-    wait_for_space(win, "Unimodal Trial: Press SPACE to begin.")
+    wait_for_space(win, "Shape/Sound Trials: Press SPACE to begin.")
 
     show_practice_visual_until_space(win, stimuli["visual"]["target"], with_border=True)
-    wait_for_space(win, "This is the target shape.\n\nPress SPACE to see other shapes.")
+    wait_for_space(win, "This is the target shape.")
     show_practice_fixation(win)
 
     options = [stimuli["visual"]["associated"], stimuli["visual"]["distractor"]]
@@ -203,7 +203,7 @@ def run_aa_practice(win, stimuli):
     stimuli["audio"]["target"].play()
     core.wait(1.0)
 
-    wait_for_space(win, "Now you'll hear two more sounds.\n\nPress SPACE to continue.")
+    wait_for_space(win, "Next you will hear two sounds.\n\nPress SPACE to continue.")
     show_practice_fixation(win)
     options = [stimuli["audio"]["associated"], stimuli["audio"]["distractor"]]
     random.shuffle(options)
@@ -220,15 +220,19 @@ def run_aa_practice(win, stimuli):
 def run_practice_trials(win, participant_id):
     """Run practice trials with order counterbalanced by participant_id."""
 
+    practice_instructions = (
+        "Practice Instructions:\n\n"
+        "You will first complete a few practice trials to learn how the task works.\n"
+        "In each trial, you will see or hear a target stimulus (a shape or a sound).\n"
+        "Then, you will be given two options. Your job is to choose which one matches the target.\n\n"
+        "Press '1' if the FIRST option matches the target.\n"
+        "Press '2' if the SECOND option matches the target.\n\n"
+        "You will receive feedback after each response.\n\n"
+        "Press SPACEBAR to begin practice."
+    )
     instructions = visual.TextStim(
         win,
-        text=(
-        "This is a practice trial.\n"
-        "You will be presented with a shape and either sounds or more shapes.\n"
-        "Respond using the '1' or '2' keys based on which item matches the target.\n"
-        "You will receive feedback after each response.\n\n"
-        "Press SPACEBAR to begin."
-        ),
+        text=practice_instructions,
         color="lightgray", height=0.06
     )
     instructions.draw()
@@ -653,7 +657,7 @@ def block1_crossmodal():
 
         progress_bar = create_progress_bar(progress_value)
 
-        TRIALS_BEFORE_BREAK = 35  # Break every 35 trials
+        TRIALS_BEFORE_BREAK = 45  
         total_trials = len(crossmodal_trials)
 
         fixation = visual.TextStim(win, text="+", color="lightgrey", height=0.1, pos=(0, 0))
@@ -739,7 +743,7 @@ def block1_crossmodal():
                 participant_data["block 1 incorrect"] += 1
                 incorrect_feedback.draw()
             win.flip()
-            core.wait(0.5)  # always 0.5s
+            core.wait(0.3)  # changed from 0.5 to 0.3
 
             progress_value += 1.0 / total_trials
             progress_bar = create_progress_bar(progress_value)
@@ -812,9 +816,9 @@ def block2_unimodal():
     instruction_result = show_instructions(
         "Task Instructions: \n\n"
         "You will complete two types of trials:\n"
-        "1. Visual only: You will see a shape twice, each time with a different pairing.\n"
-        "2. Auditory only: You will hear two sounds in sequence, one is correct, one is not.\n"
-        "For each, press '1' if the first matches, '2' if the second matches.\n"
+        "1. You will see a target shape, followed by two more shapes.\n"
+        "2. You will hear a target sound, followed by two more sounds.\n"
+        "For each, press '1' if the first stimulus matches the target, '2' if the second stimulus matches the target.\n"
         "You will receive feedback after each response.\n\n"
         "Press SPACEBAR to continue.",
         ["space"]
@@ -919,8 +923,10 @@ def block2_unimodal():
         )
 
     progress_bar = create_progress_bar(progress_value)
-    TRIALS_BEFORE_BREAK = 35  # Break every 35 trials
+    TRIALS_BEFORE_BREAK = 45  
 
+    # Change: define red fixation for trial start
+    fixation_red = visual.TextStim(win, text="+", color="red", height=0.1, pos=(0, 0))
     fixation = visual.TextStim(win, text="+", color="lightgrey", height=0.1, pos=(0, 0))
     prompt_visual = visual.TextStim(win, text="Press 1 if FIRST shape matches; 2 if SECOND shape matches.",
                                     color="white", height=0.05, pos=(0, 0))
@@ -942,8 +948,11 @@ def block2_unimodal():
         correct_answer = None
         order = None
 
-        # --- Fixation before stimulus ---
-        fixation.draw()
+        # --- Fixation before stimulus: red if auditory target, grey if visual target ---
+        if trial_type == "auditory":
+            fixation_red.draw()
+        else:
+            fixation.draw()
         progress_bg.draw()
         progress_bar.draw()
         win.flip()
@@ -954,10 +963,25 @@ def block2_unimodal():
             shape_file, associated_shape_file = trial[1], trial[2]
             images = trial[3]
 
+            # Show the target shape
+            img_stim.image = os.path.join("./generated_shapes", shape_file)
+            draw_red_border(win, img_stim)
+            img_stim.draw()
+            progress_bg.draw()
+            progress_bar.draw()
+            win.flip()
+            core.wait(STIMULUS_DURATION)
+
+            # Optional fixation
+            fixation.draw()
+            progress_bg.draw()
+            progress_bar.draw()
+            win.flip()
+            core.wait(FIXATION_DURATION)
+
+            # --- FIX: Show both test shapes, one after the other ---
             for i in range(2):
                 img_stim.image = os.path.join("./generated_associated_shapes", images[i])
-                if i == 0:
-                    draw_red_border(win, img_stim)
                 img_stim.draw()
                 progress_bg.draw()
                 progress_bar.draw()
@@ -971,6 +995,7 @@ def block2_unimodal():
                     core.wait(FIXATION_DURATION)  # always 0.3s
                 else:
                     core.wait(FIXATION_DURATION)  # always 0.3s
+            # -------------------------------------------------------
 
             prompt_visual.draw()
             progress_bg.draw()
@@ -1000,15 +1025,23 @@ def block2_unimodal():
             sound_file, associated_sound_file = trial[1], trial[2]
             sounds_pair = trial[3]
 
+            # Play the target sound (the one to match)
+            preloaded_sounds[sound_file].play()
+            core.wait(STIMULUS_DURATION)
+
+            # Fixation between target and test sounds
+            show_red_fixation(win)
+            progress_bg.draw()
+            progress_bar.draw()
+            win.flip()
+            core.wait(FIXATION_DURATION)
+
             for i in range(2):
-                if i == 0:
-                    show_red_fixation(win)
-                else:
-                    fixation.draw()
-                    progress_bg.draw()
-                    progress_bar.draw()
-                    win.flip()
-                    core.wait(FIXATION_DURATION)  # always 0.3s
+                fixation.draw()
+                progress_bg.draw()
+                progress_bar.draw()
+                win.flip()
+                core.wait(FIXATION_DURATION)  # always 0.3s
                 # Play from associated sounds directory
                 preloaded_associated_sounds[sounds_pair[i]].play()
                 core.wait(STIMULUS_DURATION)  # always 1s
@@ -1044,7 +1077,7 @@ def block2_unimodal():
             participant_data["block 2 incorrect"] += 1
             incorrect_feedback.draw()
         win.flip()
-        core.wait(0.5)  # always 0.5s
+        core.wait(0.3)  # changed from 0.5 to 0.3
 
         progress_value += 1.0 / total_trials
         progress_bar = create_progress_bar(progress_value)
@@ -1096,15 +1129,17 @@ def block3_testing():
     global participant_data
     participant_data["block3_test_log"] = []
 
+    block3_instructions = (
+        "Task Instructions:\n\n"
+        "In this block, you will complete trials where the target may be a shape or a sound.\n"
+        "After the target, you will see or hear TWO options. Only one option matches the target.\n\n"
+        "Press '1' if the FIRST option matches the target.\n"
+        "Press '2' if the SECOND option matches the target.\n\n"
+        "You will NOT receive feedback in this block.\n\n"
+        "Press SPACEBAR to begin."
+    )
     instruction_result = show_instructions(
-        "Block 3 Instructions: \n\n"
-        "You will complete four types of trials:\n"
-        "1. Visual cue: See a shape, then hear two sounds. Press 1 if the FIRST sound matches, 2 if the SECOND matches.\n"
-        "2. Auditory cue: Hear a sound, then see two shapes. Press 1 if the FIRST shape matches, 2 if the SECOND matches.\n"
-        "3. Auditory only: Hear a sound, then hear two sounds. Press 1 if the FIRST matches, 2 if the SECOND matches.\n"
-        "4. Visual only: See a shape, then see two shapes. Press 1 if the FIRST matches, 2 if the SECOND matches.\n"
-        "You will NOT receive feedback.\n\n"
-        "Press SPACEBAR to continue.",
+        block3_instructions,
         ["space"]
     )
     if instruction_result == "s":
@@ -1234,6 +1269,7 @@ def block3_testing():
         progress_bar = create_progress_bar(progress_value)
 
         # Reusable stimuli
+        fixation_red = visual.TextStim(win, text="+", color="red", height=0.1, pos=(0, 0))
         fixation = visual.TextStim(win, text="+", color="lightgrey", height=0.1, pos=(0, 0))
         prompt_sound2 = visual.TextStim(win, text="Press 1 if FIRST sound matches; 2 if SECOND sound matches.",
                                         color="white", height=0.05, pos=(0, 0))
@@ -1241,7 +1277,7 @@ def block3_testing():
                                         color="white", height=0.05, pos=(0, 0))
         img_stim = visual.ImageStim(win, image=None, size=(0.3, 0.4), pos=(0, 0))
 
-        TRIALS_BEFORE_BREAK = 60  # Break every 60 trials (~4 breaks)
+        TRIALS_BEFORE_BREAK = 60  
 
         for trial_index, trial in enumerate(all_trials):
             if "escape" in event.getKeys():
@@ -1255,8 +1291,11 @@ def block3_testing():
             correct_answer = None
             order = trial["order"]
 
-            # --- Fixation ---
-            fixation.draw()
+            # --- Fixation before stimulus: red if auditory target, grey if visual target ---
+            if trial["trial_type"] in ["auditory_cue", "auditory_only"]:
+                fixation_red.draw()
+            else:
+                fixation.draw()
             progress_bg.draw()
             progress_bar.draw()
             win.flip()
