@@ -214,7 +214,7 @@ def run_practice_trials(win, participant_id):
         "Practice Instructions:\n\n"
         "You will first complete a few practice trials to learn how the task works.\n"
         "In each trial, you will see or hear a target stimulus (a shape or a sound).\n"
-        "Then, you will be given two options. Your job is to choose which one matches the target.\n\n"
+        "Then, you will be given two options. Your task is to choose which one matches the target.\n\n"
         "Press '1' if the FIRST option matches the target.\n"
         "Press '2' if the SECOND option matches the target.\n\n"
         "You will receive feedback after each response.\n\n"
@@ -363,16 +363,6 @@ def run_end_survey():
             else:
                 continue
             break
-    # Save responses to CSV
-    participant_folder = os.path.join("./participant_data", participant_data["participant_id"])
-    os.makedirs(participant_folder, exist_ok=True)
-    survey_path = os.path.join(participant_folder, "end_survey.csv")
-    with open(survey_path, "w", newline='', encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(["question", "response"])
-        for q, r in zip(survey_questions, responses):
-            writer.writerow([q, r])
-    print(f"Survey responses saved to {survey_path}")
 
     # Save responses to Excel
     try:
@@ -576,11 +566,17 @@ def crossmodal_with_feedback():
     print("Starting Crossmodal with feedback...")
 
     instruction_result = show_instructions(
-        "Task Instructions: \n\n"
-        "You will be presented with a shape and two sounds.\n"
-        "Press '1' if the first sound matches the shape, '2' if the second sound matches the shape. \n"
-        "You will receive feedback after each response.\n\n"
-        "Press SPACEBAR to continue.",
+        "INSTRUCTIONS – Crossmodal Block with Feedback\n\n"
+        "In this block, you’ll see a SHAPE and then hear TWO SOUNDS, one after the other.\n\n"
+        "Only ONE of the sounds is the correct match for the shape.\n\n"
+        "When asked to do so:\n"
+        "• ‘1’ if the FIRST sound matches the shape\n"
+        "• ‘2’ if the SECOND sound matches the shape\n\n"
+        "You’ll get FEEDBACK after each response:\n"
+        "✓ A green check mark means you were correct.\n"
+        "✗ A red X means the other sound was correct.\n\n"
+        "Try your best to match the correct sound to the shape.\n\n"
+        "Press SPACEBAR to begin.",
         ["space"]
     )
     if instruction_result == "s":
@@ -794,7 +790,7 @@ def crossmodal_with_feedback():
             if (trial_index + 1) % TRIALS_BEFORE_BREAK == 0 and (trial_index + 1) < total_trials:
                 break_msg = visual.TextStim(
                     win,
-                    text=(f"You may take a short break.\n\n"
+                    text=(f"You may take a 30 second break.\n\n"
                           "Press SPACEBAR when you are ready to continue."),
                     color="lightgrey", height=0.06, pos=(0, 0)
                 )
@@ -835,10 +831,15 @@ def crossmodal_no_feedback():
     print("Starting Crossmodal no feedback...")
 
     instruction_result = show_instructions(
-        "Task Instructions: \n\n"
-        "You will be presented with a shape and two sounds.\n"
-        "Press '1' if the first sound matches the shape, '2' if the second sound matches the shape. \n"
-        "Press SPACEBAR to continue.",
+        "INSTRUCTIONS – Crossmodal Block (No Feedback)\n\n"
+        "You’ll again see a SHAPE and then hear TWO SOUNDS.\n\n"
+        "Only ONE of the sounds is the correct match for the shape.\n\n"
+        "When asked to do so:\n"
+        "• ‘1’ if the FIRST sound matches the shape\n"
+        "• ‘2’ if the SECOND sound matches the shape\n\n"
+        "This time, you will NOT get feedback after each response.\n\n"
+        "Just do your best to match what you’ve learned.\n\n"
+        "Press SPACEBAR to begin.",
         ["space"]
     )
     if instruction_result == "s":
@@ -1048,7 +1049,7 @@ def crossmodal_no_feedback():
             if (trial_index + 1) % TRIALS_BEFORE_BREAK == 0 and (trial_index + 1) < total_trials:
                 break_msg = visual.TextStim(
                     win,
-                    text=(f"You may take a short break.\n\n"
+                    text=(f"You may take a 30 second break.\n\n"
                           "Press SPACEBAR when you are ready to continue."),
                     color="lightgrey", height=0.06, pos=(0, 0)
                 )
@@ -1088,13 +1089,21 @@ def unimodal_with_feedback():
     print("Unimodal block with feedback...")
 
     instruction_result = show_instructions(
-        "Task Instructions: \n\n"
-        "You will complete two types of trials:\n"
-        "1. You will see a target shape, followed by two more shapes.\n"
-        "2. You will hear a target sound, followed by two more sounds.\n"
-        "For each, press '1' if the first stimulus matches the target, '2' if the second stimulus matches the target.\n"
-        "You will receive feedback after each response.\n\n"
-        "Press SPACEBAR to continue.",
+        "INSTRUCTIONS – Shape and Sound Matching with Feedback\n\n"
+        "In this block, you’ll do TWO kinds of trials:\n\n"
+        "1. Shape matching:\n"
+        "• You’ll see a TARGET shape, followed by TWO shapes.\n"
+        "When asked to do so:\n"
+        "• Press ‘1’ if the FIRST shape matches the target.\n"
+        "• Press ‘2’ if the SECOND shape matches.\n\n"
+        "2. Sound matching:\n"
+        "• You’ll hear a TARGET sound, then hear TWO sounds.\n"
+        "When asked to do so:\n"
+        "• Press ‘1’ if the FIRST sound matches the target.\n"
+        "• Press ‘2’ if the SECOND sound matches.\n\n"
+        "You’ll get FEEDBACK after each trial:\n"
+        "✓ for correct, ✗ for incorrect.\n\n"
+        "Press SPACEBAR to begin.",
         ["space"]
     )
     if instruction_result == "s":
@@ -1445,7 +1454,7 @@ def unimodal_with_feedback():
         if (trial_index + 1) % TRIALS_BEFORE_BREAK == 0 and (trial_index + 1) < total_trials:
             break_msg = visual.TextStim(
                 win,
-                text=(f"You may take a short break.\n\n"
+                text=(f"You may take a 30 second break.\n\n"
                       "Press SPACEBAR when you are ready to continue."),
                 color="lightgrey", height=0.06, pos=(0, 0)
             )
@@ -1480,12 +1489,16 @@ def unimodal_no_feedback():
     print("Starting Unimodal no feedback...")
 
     instruction_result = show_instructions(
-        "Task Instructions: \n\n"
-        "You will complete two types of trials:\n"
-        "1. You will see a target shape, followed by two more shapes.\n"
-        "2. You will hear a target sound, followed by two more sounds.\n"
-        "For each, press '1' if the first stimulus matches the target, '2' if the second stimulus matches the target.\n"
-        "Press SPACEBAR to continue.",
+        "INSTRUCTIONS – Shape and Sound Matching (No Feedback)\n\n"
+        "You’ll again complete both shape and sound trials:\n\n"
+        "1. Shape trials: See a target shape → then two options\n"
+        "2. Sound trials: Hear a target sound → then two options\n\n"
+        "When asked to do so:\n"
+        "• Press ‘1’ if the FIRST option matches the target\n"
+        "• Press ‘2’ if the SECOND option matches\n\n"
+        "Please wait until you're asked before responding — don’t press any keys early.\n\n"
+        "You will NOT get feedback.\n\n"
+        "Press SPACEBAR to begin.",
         ["space"]
     )
     if instruction_result == "s":
@@ -1827,7 +1840,7 @@ def unimodal_no_feedback():
         if (trial_index + 1) % TRIALS_BEFORE_BREAK == 0 and (trial_index + 1) < total_trials:
             break_msg = visual.TextStim(
                 win,
-                text=(f"You may take a short break.\n\n"
+                text=(f"You may take a 30 second break.\n\n"
                       "Press SPACEBAR when you are ready to continue."),
                 color="lightgrey", height=0.06, pos=(0, 0)
             )
