@@ -3,7 +3,7 @@ prefs.hardware['audioLib'] = ['pygame']  # or try 'pyo', or ['pygame', 'pyo']
 import os
 os.environ["QT_QPA_PLATFORM"] = "cocoa"
 import random
-random.seed(42)  # Added fixed seed for consistent random pairings
+#random.seed(42)  # Added fixed seed for consistent random pairings
 import pandas as pd
 import csv
 import time
@@ -11,26 +11,16 @@ from psychopy import visual, core, gui, event, sound, prefs
 import numpy as np
 import traceback
 
+# This version of the code splits the associated stimuli to be shown on the left and right, with a 0.5s gap in between
+# This version has two potential orders
+# If participant ID is odd, crossmodal block with feedback first, then unimodal testing block with no feedback
+# If participant ID is even, unimodal block with feedback first, then crossmodal testing block with no feedback
+# This version does not use the practice block before the main blocks, because it hasn't been updated yet
+# Trials should be completely randomized, and unimodal block should be interleaved 1:1 audio and visual
+# Participant responses will only be recorded after they have been prompted to answer
+# Sounds are stopped before playing the next sound, to avoid overlap
+
 # === Collect participant ID and set up directories before anything else ===
-'''def get_participant_id():
-    """Prompt for participant ID and handle existing data."""
-    info = {"Participant ID": ""}
-    dlg = gui.DlgFromDict(info, title="Participant Info")
-    if not dlg.OK:
-        core.quit()
-    participant_id = info["Participant ID"]
-
-    # Create participant data folder if it doesn't exist
-    participant_folder = os.path.join("./participant_data", participant_id)
-    if not os.path.exists(participant_folder):
-        os.makedirs(participant_folder)
-    else:
-        # Always overwrite existing data
-        data_files = [f for f in os.listdir(participant_folder) if os.path.isfile(os.path.join(participant_folder, f))]
-        for file in data_files:
-            os.remove(os.path.join(participant_folder, file))
-
-    return participant_id'''
 
 def get_participant_id():
     participant_id = input("Enter Participant ID: ")
@@ -257,27 +247,27 @@ def run_practice_trials(win, participant_id):
 
     wait_for_space(win, "Practice complete.\n\nPress SPACE to continue.")
 
-def save_block1_crossmodal_to_excel():
-    # Save block 1 data to Excel in the participant folder as block1_log.xlsx
+def save_crossmodal_with_feedback_to_excel():
+    # Save crossmodal with feedback data to Excel in the participant folder as crossmodal_wf_log.xlsx
     import os
     import pandas as pd
     participant_folder = os.path.join("./participant_data", participant_data["participant_id"])
     os.makedirs(participant_folder, exist_ok=True)
-    df = pd.DataFrame(participant_data.get("block1_crossmodal_log", []))
-    excel_filename = os.path.join(participant_folder, "block1_crossmodal_log.xlsx")
+    df = pd.DataFrame(participant_data.get("crossmodal_wf_log", []))
+    excel_filename = os.path.join(participant_folder, "crossmodal_wf_log.xlsx")
     df.to_excel(excel_filename, index=False)
-    print(f"Block 1 data saved to {excel_filename}")
+    print(f"Crossmodal with feedback data saved to {excel_filename}")
 
-def save_block2_unimodal_to_excel():
-    # Save block 2 data to Excel in the participant folder as block2_unimodal_log.xlsx
+def save_unimodal_with_feedback_to_excel():
+    # Save unimodal with feedback data to Excel in the participant folder as unimodal_wf_log.xlsx
     import os
     import pandas as pd
     participant_folder = os.path.join("./participant_data", participant_data["participant_id"])
     os.makedirs(participant_folder, exist_ok=True)
-    df = pd.DataFrame(participant_data.get("block2_unimodal_log", []))
-    excel_filename = os.path.join(participant_folder, "block2_unimodal_log.xlsx")
+    df = pd.DataFrame(participant_data.get("unimodal_wf_log", []))
+    excel_filename = os.path.join(participant_folder, "unimodal_wf_log.xlsx")
     df.to_excel(excel_filename, index=False)
-    print(f"Block 2 data saved to {excel_filename}")
+    print(f"Unimodal with feedback data saved to {excel_filename}")
 
 def save_crossmodal_no_feedback_to_excel():
     # Save crossmodal testing to Excel in the participant folder as crossmodal_nf_log.xlsx
@@ -291,7 +281,7 @@ def save_crossmodal_no_feedback_to_excel():
     print(f"Crossmodal no feedback data saved to {excel_filename}")
 
 def save_unimodal_no_feedback_to_excel():
-    # Save block 1 data to Excel in the participant folder as unimodal_nf_log.xlsx
+    # Save unimodal no feedback data to Excel in the participant folder as unimodal_nf_log.xlsx
     import os
     import pandas as pd
     participant_folder = os.path.join("./participant_data", participant_data["participant_id"])
@@ -299,7 +289,7 @@ def save_unimodal_no_feedback_to_excel():
     df = pd.DataFrame(participant_data.get("unimodal_nf_log", []))
     excel_filename = os.path.join(participant_folder, "unimodal_nf_log.xlsx")
     df.to_excel(excel_filename, index=False)
-    print(f"Block 1 data saved to {excel_filename}")
+    print(f"unimodal no feedback data saved to {excel_filename}")
 
 def save_block3_test_to_excel():
     # Save block 3 data to Excel in the participant folder as block3_log.xlsx
@@ -414,12 +404,16 @@ participant_data = {
     "task order": "",
     "time on active task": 0,
     "click data": {},
-    "block 1 correct": 0,
-    "block 1 incorrect": 0,
-    "block 2 correct": 0,
-    "block 2 incorrect": 0,
+    "crossmodal with feedback correct": 0,
+    "crossmodal with feedback incorrect": 0,
+    "unimodal with feedback correct": 0,
+    "unimodal with feedback incorrect": 0,
+    "crossmodal no feedback correct": 0,
+    "crossmodal no feedback incorrect": 0,
+    "unimodal no feedback correct": 0,
+    "unimodal no feedback incorrect": 0,
     "reaction time": [],
-    "block 2 log": [],
+    "unimodal with feedback log": [],
 }
 # Set image/audio directories (adjust as needed for your experiment)
 image_dir = "./generated_shapes"
@@ -451,8 +445,8 @@ if DEBUG_SKIP_TO_BLOCK3 and DEBUG_SKIP_BLOCK3:
         win.close()
     except Exception:
         pass
-    save_block1_crossmodal_to_excel()
-    save_block2_unimodal_to_excel()
+    save_crossmodal_with_feedback_to_excel()
+    save_unimodal_with_feedback_to_excel()
     save_block3_test_to_excel()
     core.quit()
 
@@ -466,18 +460,20 @@ except Exception as e:
 # Configure sound preferences
 prefs.hardware['audioLib'] = ['pygame', 'sounddevice']
 prefs.general['audioDevice'] = ['default']
-# Use the same directories for test set as for main set
-test_image_dir = image_dir
-test_audio_dir = audio_dir
+
 
 # Store participant data
 participant_data.update({
-    "block 1 correct": 0,      # <-- Add this line
-    "block 1 incorrect": 0,    # <-- Add this line
-    "block 2 correct": 0,
-    "block 2 incorrect": 0,
+    "crossmodal with feedback correct": 0,      # <-- Add this line
+    "crossmodal with feedback incorrect": 0,    # <-- Add this line
+    "unimodal with feedback correct": 0,
+    "unimodal with feedback incorrect": 0,
+    "crossmodal no feedback correct": 0,
+    "crossmodal no feedback incorrect": 0,
+    "unimodal no feedback correct": 0,
+    "unimodal no feedback incorrect": 0,
     "reaction time": [],
-    "block 2 log": [],
+    "unimodal with feedback log": [],
 })
 
 # === Presentation timing constants ===
@@ -494,8 +490,6 @@ stimuli_pairs = [
     ("shape_06.png", "sound_06.wav"),
 ]
 
-# Test set pairings: use the same as stimuli_pairs
-test_pairs = list(stimuli_pairs)
 
 # Preload all sound objects
 def preload_sounds(audio_dir):
@@ -505,16 +499,15 @@ def preload_sounds(audio_dir):
     return sound_dict
 
 main_sounds = preload_sounds(audio_dir)
-test_sounds = preload_sounds(test_audio_dir)
 
-# Preload all images for block 2 visual-only trials
+# Preload all images for unimodal visual-only trials
 def preload_images(image_dir, image_files):
     return {
         fname: visual.ImageStim(win, image=os.path.join(image_dir, fname), size=(0.3, 0.4))
         for fname in set(image_files)
     }
 
-# Explicitly define visual shape pairings for block 2 (visual only)
+# Explicitly define visual shape pairings for unimodal (visual only)
 visual_shape_pairs = [
     ("shape_01.png", "associated_shape_01.png"),
     ("shape_02.png", "associated_shape_02.png"),
@@ -524,7 +517,7 @@ visual_shape_pairs = [
     ("shape_06.png", "associated_shape_06.png"),
 ]
 
-# Explicitly define auditory sound pairings for block 2 (auditory only)
+# Explicitly define auditory sound pairings for unimodal (auditory only)
 auditory_sound_pairs = [
     ("sound_01.wav", "associated_sound_01.wav"),
     ("sound_02.wav", "associated_sound_02.wav"),
@@ -534,33 +527,13 @@ auditory_sound_pairs = [
     ("sound_06.wav", "associated_sound_06.wav"),
 ]
 
-# Preload associated sounds for block 2 auditory-only trials
+# Preload associated sounds for unimodal auditory-only trials
 def preload_sounds_explicit(audio_dir, sound_files):
     return {
         fname: sound.Sound(os.path.join(audio_dir, fname))
         for fname in set(sound_files)
     }
 
-# Define utility functions first
-def get_participant_id():
-    """Prompt for participant ID and handle existing data."""
-    info = {"Participant ID": ""}
-    dlg = gui.DlgFromDict(info, title="Participant Info")
-    if not dlg.OK:
-        core.quit()
-    participant_id = info["Participant ID"]
-
-    # Create participant data folder if it doesn't exist
-    participant_folder = os.path.join("./participant_data", participant_id)
-    if not os.path.exists(participant_folder):
-        os.makedirs(participant_folder)
-    else:
-        # Always overwrite existing data
-        data_files = [f for f in os.listdir(participant_folder) if os.path.isfile(os.path.join(participant_folder, f))]
-        for file in data_files:
-            os.remove(os.path.join(participant_folder, file))
-
-    return participant_id
 
 def draw_red_border(win, img_stim):
     # Draws a red border around the given ImageStim
@@ -582,49 +555,42 @@ def draw_red_border(win, img_stim):
     )
     border.draw()
 
-def show_red_fixation(win):
+# This function is no longer necessary, the red fixation is drawn manually in the unimodal blocks, but might be useful for practice trials?
+
+'''def show_red_fixation(win):
     fixation = visual.TextStim(win, text="+", color="red", height=0.1)
     fixation.draw()
     win.flip()
-    core.wait(0.5)
+    core.wait(0.5)'''
 
 # Define block functions next
 
-# Block 1 - Crossmodal
+# Crossmodal with feedback
 
-def block1_crossmodal():
+def crossmodal_with_feedback():
     global participant_data
     participant_data["task order"] = "active"
-    participant_data["block1_crossmodal_log"] = []
+    participant_data["crossmodal_wf_log"] = []
     event.clearEvents()
 
-    print("Starting Block 1 Crossmodal...")
+    print("Starting Crossmodal with feedback...")
 
     instruction_result = show_instructions(
         "Task Instructions: \n\n"
-        "In this block, you will learn which shapes go with which sounds.\n"
-        "Here's what happens on each trial:\n" 
-        "1. You will first see ONE SHAPE.\n"
-        "2. Then you will hear TWO SOUNDS, played one after the other.\n"
-        "Only ONE of these sounds is the correct match for the shape. \n"
-        "Your task:\n"
-        "Decide which of the two sounds matched the target.\n\n"
-        "Press:\n"
-        "- 1 → if you think the FIRST sound matches the target\n"
-        "- 2 → if you think the SECOND sound matches the target\n\n"
-        "After you respond, you will get feedback telling you whether you were correct or incorrect.\n\n"
-        "Try your best to learn the correct pairings!\n\n"
+        "You will be presented with a shape and two sounds.\n"
+        "Press '1' if the first sound matches the shape, '2' if the second sound matches the shape. \n"
+        "You will receive feedback after each response.\n\n"
         "Press SPACEBAR to continue.",
         ["space"]
     )
     if instruction_result == "s":
         return "skip"
     if instruction_result != "space":
-        print("Block 1 Crossmodal skipped.")
+        print("Crossmodal with feedback skipped.")
         return "skip"
 
     try:
-        print("Entering trial loop for Block 1 Crossmodal...")
+        print("Entering trial loop for Crossmodal with feedback...")
         local_stimuli = list(stimuli_pairs)
         crossmodal_trials = []
         # For each pair, create exactly half congruent-first and half congruent-second
@@ -648,6 +614,12 @@ def block1_crossmodal():
                     incorrect_tone = random.choice(available_tones)
                     crossmodal_trials.append((img_file, audio_file, [incorrect_tone, audio_file]))
         random.shuffle(crossmodal_trials)
+
+        # === DEBUG CHECK: Count how often correct sound is in position 1 or 2 ===
+        from collections import Counter
+        side_counts = Counter(['1' if t[2][0] == t[1] else '2' for t in crossmodal_trials])
+        print("Correct sound position counts:", side_counts)
+        # =======================================================================
 
         correct_feedback = visual.ImageStim(win, image="green_tick.png", size=(0.2, 0.2), pos=(0, 0))
         incorrect_feedback = visual.ImageStim(win, image="red_cross.png", size=(0.2, 0.2), pos=(0, 0))
@@ -757,6 +729,7 @@ def block1_crossmodal():
             # -----------------------------------------------------------------------
 
             # Prompt for response
+            event.clearEvents()  # ✅ Flush any premature keypresses before collecting input
             prompt_sound2.draw()
             progress_bg.draw()
             progress_bar.draw()
@@ -782,19 +755,21 @@ def block1_crossmodal():
 
             participant_data["reaction time"].append(reaction_time)
             if response == correct_answer:
-                participant_data["block 1 correct"] += 1
+                participant_data["crossmodal with feedback correct"] += 1
                 correct_feedback.draw()
             else:
-                participant_data["block 1 incorrect"] += 1
+                participant_data["crossmodal with feedback incorrect"] += 1
                 incorrect_feedback.draw()
+            progress_bg.draw()
+            progress_bar.draw()
             win.flip()
-            core.wait(0.3)  # changed from 0.5 to 0.3
+            core.wait(0.5)  # changed from 0.5 to 0.3 and back to 0.5
 
             progress_value += 1.0 / total_trials
             progress_bar = create_progress_bar(progress_value)
 
             try:
-                participant_data["block1_crossmodal_log"].append({
+                participant_data["crossmodal_wf_log"].append({
                     "trial_index": trial_index,
                     "trial_type": "shape+2sounds",
                     "stimulus": img_file,
@@ -841,11 +816,11 @@ def block1_crossmodal():
         if "s" in keys:
             return "skip"
 
-        print("Block 1 completed successfully.")
+        print("crossmodal with feedback completed successfully.")
         return "done"
 
     except Exception as e:
-        print("Error during block 1 crossmodal:")
+        print("Error during crossmodal with feedback:")
         traceback.print_exc()
         core.quit()
 
@@ -854,36 +829,26 @@ def block1_crossmodal():
 def crossmodal_no_feedback():
     global participant_data
     participant_data["task order"] = "active"
-    participant_data["block1_crossmodal_log"] = []
+    participant_data["crossmodal_nf_log"] = []
     event.clearEvents()
 
-    print("Starting Block 1 Crossmodal...")
+    print("Starting Crossmodal no feedback...")
 
     instruction_result = show_instructions(
         "Task Instructions: \n\n"
-        "In this block, you will learn which shapes go with which sounds.\n"
-        "Here's what happens on each trial:\n" 
-        "1. You will first see ONE SHAPE.\n"
-        "2. Then you will hear TWO SOUNDS, played one after the other.\n"
-        "Only ONE of these sounds is the correct match for the shape. \n"
-        "Your task:\n"
-        "Decide which of the two sounds matched the target.\n\n"
-        "Press:\n"
-        "- 1 → if you think the FIRST sound matches the target\n"
-        "- 2 → if you think the SECOND sound matches the target\n\n"
-        "After you respond, you will get feedback telling you whether you were correct or incorrect.\n\n"
-        "Try your best to learn the correct pairings!\n\n"
+        "You will be presented with a shape and two sounds.\n"
+        "Press '1' if the first sound matches the shape, '2' if the second sound matches the shape. \n"
         "Press SPACEBAR to continue.",
         ["space"]
     )
     if instruction_result == "s":
         return "skip"
     if instruction_result != "space":
-        print("Block 1 Crossmodal skipped.")
+        print("Crossmodal no feedback skipped.")
         return "skip"
 
     try:
-        print("Entering trial loop for Block 1 Crossmodal...")
+        print("Entering trial loop for Crossmodal no feedback...")
         local_stimuli = list(stimuli_pairs)
         crossmodal_trials = []
         # For each pair, create exactly half congruent-first and half congruent-second
@@ -1016,6 +981,7 @@ def crossmodal_no_feedback():
             # -----------------------------------------------------------------------
 
             # Prompt for response
+            event.clearEvents()  # ✅ Flush any premature keypresses before collecting input
             prompt_sound2.draw()
             progress_bg.draw()
             progress_bar.draw()
@@ -1041,9 +1007,9 @@ def crossmodal_no_feedback():
 
             participant_data["reaction time"].append(reaction_time)
             if response == correct_answer:
-                participant_data["block 1 correct"] += 1
+                participant_data["crossmodal no feedback correct"] += 1
             else:
-                participant_data["block 1 incorrect"] += 1
+                participant_data["crossmodal no feedback incorrect"] += 1
 
             # Show neutral fixation instead of feedback
             fixation.pos = (0, 0)
@@ -1057,7 +1023,7 @@ def crossmodal_no_feedback():
             progress_bar = create_progress_bar(progress_value)
 
             try:
-                participant_data["block1_crossmodal_log"].append({
+                participant_data["crossmodal_nf_log"].append({
                     "trial_index": trial_index,
                     "trial_type": "shape+2sounds",
                     "stimulus": img_file,
@@ -1104,50 +1070,37 @@ def crossmodal_no_feedback():
         if "s" in keys:
             return "skip"
 
-        print("Block 1 completed successfully.")
+        print("crossmodal no feedback completed successfully.")
         return "done"
 
     except Exception as e:
-        print("Error during block 1 crossmodal:")
+        print("Error during crossmodal no feedback:")
         traceback.print_exc()
         core.quit()
 
-# Block 2 - Unimodal
+# Unimodal with feedback
 
-def block2_unimodal():
+def unimodal_with_feedback():
     global participant_data
-    participant_data["block2_unimodal_log"] = []
+    participant_data["unimodal_wf_log"] = []
     event.clearEvents()
 
-    print("Starting Block 2 Unimodal...")
+    print("Unimodal block with feedback...")
 
     instruction_result = show_instructions(
-        "In this block, you will learn which shapes go with other shapes,\n"
-        "and which sounds go with other sounds.\n\n"
-        "There are two types of trials in this block:\n\n"
-        "1. Visual trials:\n"
-        "- You will first see ONE TARGET SHAPE outlined in red.\n"
-        "- Then you will see TWO MORE SHAPES, one after the other.\n"
-        "- Only ONE of these shapes is the correct match for the target.\n\n"
-        "2. Auditory trials:\n"
-        "- You will first hear ONE TARGET SOUND indicated by red cross.\n"
-        "- Then you will hear TWO MORE SOUNDS, one after the other.\n"
-        "- Only ONE of these sounds is the correct match for the target.\n\n"
-        "Your task:\n"
-        "Decide which of the two items matched the target.\n\n"
-        "Press:\n"
-        "- 1 → if you think the FIRST item matches the target\n"
-        "- 2 → if you think the SECOND item matches the target\n\n"
-        "After you respond, you will get feedback telling you whether you were correct or incorrect.\n\n"
-        "Try your best to learn the correct pairings!\n\n"
-        "Press the SPACE bar to begin.",
+        "Task Instructions: \n\n"
+        "You will complete two types of trials:\n"
+        "1. You will see a target shape, followed by two more shapes.\n"
+        "2. You will hear a target sound, followed by two more sounds.\n"
+        "For each, press '1' if the first stimulus matches the target, '2' if the second stimulus matches the target.\n"
+        "You will receive feedback after each response.\n\n"
+        "Press SPACEBAR to continue.",
         ["space"]
     )
-
     if instruction_result == "s":
         return "skip"
     if instruction_result != "space":
-        print("Block 2 Unimodal skipped.")
+        print("Unimodal with feedback skipped.")
         return "skip"
 
     # Prepare trial lists using explicit pairings
@@ -1189,8 +1142,25 @@ def block2_unimodal():
             else:
                 distractor = random.choice(distractors)
                 auditory_only_trials.append(("auditory", a[0], a[1], [distractor, a[1]]))
-    unimodal_trials = visual_only_trials + auditory_only_trials
-    random.shuffle(unimodal_trials)
+    # Make sure both trial lists are the same length
+    min_length = min(len(visual_only_trials), len(auditory_only_trials))
+    visual_only_trials = visual_only_trials[:min_length]
+    auditory_only_trials = auditory_only_trials[:min_length]
+
+    # Shuffle each list independently
+    random.shuffle(visual_only_trials)
+    random.shuffle(auditory_only_trials)
+
+    # Interleave strictly 1:1
+    if random.choice([True, False]):
+        unimodal_trials = [item for pair in zip(visual_only_trials, auditory_only_trials) for item in pair]
+    else:
+        unimodal_trials = [item for pair in zip(auditory_only_trials, visual_only_trials) for item in pair]
+
+    # Optional sanity check
+    for i in range(1, len(unimodal_trials)):
+        assert unimodal_trials[i][0] != unimodal_trials[i - 1][0], f"Error: trial {i} repeats modality"
+
 
     # Preload images
     shape_files = [v[0] for v in visual_shape_pairs]
@@ -1208,7 +1178,7 @@ def block2_unimodal():
     correct_feedback = visual.ImageStim(win, image="green_tick.png", size=(0.2, 0.2), pos=(0, 0))
     incorrect_feedback = visual.ImageStim(win, image="red_cross.png", size=(0.2, 0.2), pos=(0, 0))
 
-    # Progress bar setup (same as block 1)
+    # Progress bar setup (same as crossmodal)
     total_trials = len(unimodal_trials)
     progress_value = 0.0
     bar_width = 0.5
@@ -1331,6 +1301,7 @@ def block2_unimodal():
             img_stim.pos = (0, 0)
             # -------------------------------------------------------
 
+            event.clearEvents()  # ✅ Flush any premature keypresses before collecting input
             prompt_visual.draw()
             progress_bg.draw()
             progress_bar.draw()
@@ -1359,12 +1330,31 @@ def block2_unimodal():
             sound_file, associated_sound_file = trial[1], trial[2]
             sounds_pair = trial[3]
 
-            # Play the target sound (the one to match)
-            preloaded_sounds[sound_file].play()
+            # --- Target sound with red fixation and progress bar ---
+            fixation_red.pos = (0, 0)
+            fixation_red.draw()
+            progress_bg.draw()
+            progress_bar.draw()
+            win.flip()
+
+            # Debug: Print which sound is being played
+            print(f"\n🔊 Trial {trial_index} — Trying to play target sound: {sound_file}")
+
+            if sound_file not in preloaded_sounds:
+                print(f"❌ ERROR: {sound_file} not found in preloaded_sounds!")
+            else:
+                try:
+                    for snd in preloaded_sounds.values():
+                        snd.stop()
+                    preloaded_sounds[sound_file].play()
+                    print(f"✅ Playing: {sound_file}")
+                except Exception as e:
+                    print(f"❌ ERROR while trying to play {sound_file}: {e}")
             core.wait(STIMULUS_DURATION)
 
-            # Fixation between target and test sounds
-            show_red_fixation(win)
+            # --- Pause between target and test sounds with grey fixation ---
+            fixation.pos = (0, 0)
+            fixation.draw()
             progress_bg.draw()
             progress_bar.draw()
             win.flip()
@@ -1376,6 +1366,7 @@ def block2_unimodal():
             progress_bg.draw()
             progress_bar.draw()
             win.flip()
+            preloaded_associated_sounds[sounds_pair[0]].stop()
             preloaded_associated_sounds[sounds_pair[0]].play()
             core.wait(STIMULUS_DURATION)  # 1s
 
@@ -1393,11 +1384,13 @@ def block2_unimodal():
             progress_bg.draw()
             progress_bar.draw()
             win.flip()
+            preloaded_associated_sounds[sounds_pair[1]].stop()
             preloaded_associated_sounds[sounds_pair[1]].play()
             core.wait(STIMULUS_DURATION)  # 1s
 
             fixation.pos = (0, 0)
 
+            event.clearEvents()  # ✅ Flush any premature keypresses before collecting input
             prompt_auditory.draw()
             progress_bg.draw()
             progress_bar.draw()
@@ -1423,19 +1416,21 @@ def block2_unimodal():
 
         # Feedback
         if response == correct_answer:
-            participant_data["block 2 correct"] += 1
+            participant_data["unimodal with feedback correct"] += 1
             correct_feedback.draw()
         else:
-            participant_data["block 2 incorrect"] += 1
+            participant_data["unimodal with feedback incorrect"] += 1
             incorrect_feedback.draw()
+        progress_bg.draw()
+        progress_bar.draw()
         win.flip()
-        core.wait(0.3)  # changed from 0.5 to 0.3
+        core.wait(0.5)  # changed from 0.5 to 0.3 and back to 0.5
 
         progress_value += 1.0 / total_trials
         progress_bar = create_progress_bar(progress_value)
 
         # Log trial
-        participant_data["block2_unimodal_log"].append({
+        participant_data["unimodal_wf_log"].append({
             "trial_index": trial_index,
             "trial_type": trial_type,
             "stimulus": trial[1],
@@ -1472,44 +1467,31 @@ def block2_unimodal():
     if "s" in keys:
         return "skip"
 
-    print("Block 2 completed successfully.")
+    print("unimodal with feedback completed successfully.")
     return "done"
 
 # Unimodal no feedback version
 
 def unimodal_no_feedback():
     global participant_data
-    participant_data["block2_unimodal_log"] = []
+    participant_data["unimodal_nf_log"] = []
     event.clearEvents()
 
-    print("Starting Block 2 Unimodal...")
+    print("Starting Unimodal no feedback...")
 
     instruction_result = show_instructions(
-        "In this block, you will learn which shapes go with other shapes,\n"
-        "and which sounds go with other sounds.\n\n"
-        "There are two types of trials in this block:\n\n"
-        "1. Visual trials:\n"
-        "- You will first see ONE TARGET SHAPE outlined in red.\n"
-        "- Then you will see TWO MORE SHAPES, one after the other.\n"
-        "- Only ONE of these shapes is the correct match for the target.\n\n"
-        "2. Auditory trials:\n"
-        "- You will first hear ONE TARGET SOUND indicated by red cross.\n"
-        "- Then you will hear TWO MORE SOUNDS, one after the other.\n"
-        "- Only ONE of these sounds is the correct match for the target.\n\n"
-        "Your task:\n"
-        "Decide which of the two items matched the target.\n\n"
-        "Press:\n"
-        "- 1 → if you think the FIRST item matches the target\n"
-        "- 2 → if you think the SECOND item matches the target\n\n"
-        "After you respond, you will get feedback telling you whether you were correct or incorrect.\n\n"
-        "Try your best to learn the correct pairings!\n\n"
-        "Press the SPACE bar to begin.",
+        "Task Instructions: \n\n"
+        "You will complete two types of trials:\n"
+        "1. You will see a target shape, followed by two more shapes.\n"
+        "2. You will hear a target sound, followed by two more sounds.\n"
+        "For each, press '1' if the first stimulus matches the target, '2' if the second stimulus matches the target.\n"
+        "Press SPACEBAR to continue.",
         ["space"]
     )
     if instruction_result == "s":
         return "skip"
     if instruction_result != "space":
-        print("Block 2 Unimodal skipped.")
+        print("Unimodal no feedback skipped.")
         return "skip"
 
     # Prepare trial lists using explicit pairings
@@ -1551,8 +1533,24 @@ def unimodal_no_feedback():
             else:
                 distractor = random.choice(distractors)
                 auditory_only_trials.append(("auditory", a[0], a[1], [distractor, a[1]]))
-    unimodal_trials = visual_only_trials + auditory_only_trials
-    random.shuffle(unimodal_trials)
+    # Make sure both trial lists are the same length
+    min_length = min(len(visual_only_trials), len(auditory_only_trials))
+    visual_only_trials = visual_only_trials[:min_length]
+    auditory_only_trials = auditory_only_trials[:min_length]
+
+    # Shuffle each list independently
+    random.shuffle(visual_only_trials)
+    random.shuffle(auditory_only_trials)
+
+    # Interleave strictly 1:1
+    if random.choice([True, False]):
+        unimodal_trials = [item for pair in zip(visual_only_trials, auditory_only_trials) for item in pair]
+    else:
+        unimodal_trials = [item for pair in zip(auditory_only_trials, visual_only_trials) for item in pair]
+
+    # Optional sanity check
+    for i in range(1, len(unimodal_trials)):
+        assert unimodal_trials[i][0] != unimodal_trials[i - 1][0], f"Error: trial {i} repeats modality"
 
     # Preload images
     shape_files = [v[0] for v in visual_shape_pairs]
@@ -1570,7 +1568,7 @@ def unimodal_no_feedback():
     correct_feedback = visual.ImageStim(win, image="green_tick.png", size=(0.2, 0.2), pos=(0, 0))
     incorrect_feedback = visual.ImageStim(win, image="red_cross.png", size=(0.2, 0.2), pos=(0, 0))
 
-    # Progress bar setup (same as block 1)
+    # Progress bar setup (same as crossmodal)
     total_trials = len(unimodal_trials)
     progress_value = 0.0
     bar_width = 0.5
@@ -1693,6 +1691,7 @@ def unimodal_no_feedback():
             img_stim.pos = (0, 0)
             # -------------------------------------------------------
 
+            event.clearEvents()  # ✅ Flush any premature keypresses before collecting input
             prompt_visual.draw()
             progress_bg.draw()
             progress_bar.draw()
@@ -1721,12 +1720,21 @@ def unimodal_no_feedback():
             sound_file, associated_sound_file = trial[1], trial[2]
             sounds_pair = trial[3]
 
-            # Play the target sound (the one to match)
+            # --- Target sound with red fixation and progress bar ---
+            fixation_red.pos = (0, 0)
+            fixation_red.draw()
+            progress_bg.draw()
+            progress_bar.draw()
+            win.flip()
+
+            for snd in preloaded_sounds.values():
+                snd.stop()
             preloaded_sounds[sound_file].play()
             core.wait(STIMULUS_DURATION)
 
-            # Fixation between target and test sounds
-            show_red_fixation(win)
+            # --- Pause between target and test sounds with grey fixation ---
+            fixation.pos = (0, 0)
+            fixation.draw()
             progress_bg.draw()
             progress_bar.draw()
             win.flip()
@@ -1738,6 +1746,7 @@ def unimodal_no_feedback():
             progress_bg.draw()
             progress_bar.draw()
             win.flip()
+            preloaded_associated_sounds[sounds_pair[0]].stop()
             preloaded_associated_sounds[sounds_pair[0]].play()
             core.wait(STIMULUS_DURATION)  # 1s
 
@@ -1755,11 +1764,13 @@ def unimodal_no_feedback():
             progress_bg.draw()
             progress_bar.draw()
             win.flip()
+            preloaded_associated_sounds[sounds_pair[1]].stop()
             preloaded_associated_sounds[sounds_pair[1]].play()
             core.wait(STIMULUS_DURATION)  # 1s
 
             fixation.pos = (0, 0)
 
+            event.clearEvents()  # ✅ Flush any premature keypresses before collecting input
             prompt_auditory.draw()
             progress_bg.draw()
             progress_bar.draw()
@@ -1785,9 +1796,9 @@ def unimodal_no_feedback():
 
         # Feedback
         if response == correct_answer:
-            participant_data["block 2 correct"] += 1
+            participant_data["unimodal no feedback correct"] += 1
         else:
-            participant_data["block 2 incorrect"] += 1
+            participant_data["unimodal no feedback incorrect"] += 1
 
         # Show neutral fixation instead of feedback
         fixation.pos = (0, 0)
@@ -1801,7 +1812,7 @@ def unimodal_no_feedback():
         progress_bar = create_progress_bar(progress_value)
 
         # Log trial
-        participant_data["block2_unimodal_log"].append({
+        participant_data["unimodal_nf_log"].append({
             "trial_index": trial_index,
             "trial_type": trial_type,
             "stimulus": trial[1],
@@ -1838,450 +1849,9 @@ def unimodal_no_feedback():
     if "s" in keys:
         return "skip"
 
-    print("Block 2 completed successfully.")
+    print("unimodal no feedback completed successfully.")
     return "done"
 
-# Block 3 Testing
-
-def block3_testing():
-    global participant_data
-    participant_data["block3_test_log"] = []
-
-    block3_instructions = (
-        "Task Instructions:\n\n"
-        "In this block, you will complete trials where the target may be a shape or a sound.\n"
-        "After the target, you will see or hear TWO options. Only one option matches the target.\n\n"
-        "Press '1' if the FIRST option matches the target.\n"
-        "Press '2' if the SECOND option matches the target.\n\n"
-        "You will NOT receive feedback in this block.\n\n"
-        "Press SPACEBAR to begin."
-    )
-    instruction_result = show_instructions(
-        block3_instructions,
-        ["space"]
-    )
-    if instruction_result == "s":
-        return "skip"
-
-    try:
-        # Prepare all trial types for each pair
-        test_shape_files = [p[0] for p in test_pairs]
-        test_sound_files = [p[1] for p in test_pairs]
-        pair_dict = dict(test_pairs)
-        inv_pair_dict = {v: k for k, v in test_pairs}
-
-        # For each pair, create all four trial types
-        all_trials = []
-        for shape, sound in test_pairs:
-            # Find incongruent shape/sound
-            incongruent_shapes = [s for s in test_shape_files if s != shape]
-            incongruent_sounds = [s for s in test_sound_files if s != sound]
-            incongruent_shape = random.choice(incongruent_shapes)
-            incongruent_sound = random.choice(incongruent_sounds)
-
-            for _ in range(10 // 2):
-                # Visual cue: congruent first
-                all_trials.append({
-                    "trial_type": "visual_cue",
-                    "cue": shape,
-                    "congruent": sound,
-                    "incongruent": incongruent_sound,
-                    "order": [sound, incongruent_sound]
-                })
-                # Visual cue: congruent second
-                all_trials.append({
-                    "trial_type": "visual_cue",
-                    "cue": shape,
-                    "congruent": sound,
-                    "incongruent": incongruent_sound,
-                    "order": [incongruent_sound, sound]
-                })
-                # Auditory cue: congruent first
-                all_trials.append({
-                    "trial_type": "auditory_cue",
-                    "cue": sound,
-                    "congruent": shape,
-                    "incongruent": incongruent_shape,
-                    "order": [shape, incongruent_shape]
-                })
-                # Auditory cue: congruent second
-                all_trials.append({
-                    "trial_type": "auditory_cue",
-                    "cue": sound,
-                    "congruent": shape,
-                    "incongruent": incongruent_shape,
-                    "order": [incongruent_shape, shape]
-                })
-                # Auditory only: congruent first
-                all_trials.append({
-                    "trial_type": "auditory_only",
-                    "cue": sound,
-                    "congruent": sound,
-                    "incongruent": incongruent_sound,
-                    "order": [sound, incongruent_sound]
-                })
-                # Auditory only: congruent second
-                all_trials.append({
-                    "trial_type": "auditory_only",
-                    "cue": sound,
-                    "congruent": sound,
-                    "incongruent": incongruent_sound,
-                    "order": [incongruent_sound, sound]
-                })
-                # Visual only: congruent first
-                all_trials.append({
-                    "trial_type": "visual_only",
-                    "cue": shape,
-                    "congruent": shape,
-                    "incongruent": incongruent_shape,
-                    "order": [shape, incongruent_shape]
-                })
-                # Visual only: congruent second
-                all_trials.append({
-                    "trial_type": "visual_only",
-                    "cue": shape,
-                    "congruent": shape,
-                    "incongruent": incongruent_shape,
-                    "order": [incongruent_shape, shape]
-                })
-
-        # If odd, add one more randomly per pair/trial_type to reach 10 per type
-        if 10 % 2 != 0:
-            pass
-        random.shuffle(all_trials)
-        total_trials = len(all_trials)
-
-        # Progress bar setup
-        progress_value = 0.0
-        bar_width = 0.5
-        bar_height = 0.07
-        bar_y = -0.7
-        left_edge = -bar_width / 2.0
-
-        def create_progress_bar(p_value):
-            x1 = left_edge
-            x2 = left_edge + (p_value * bar_width)
-            fillColor = 'blue'
-            vertices = [(x1, bar_y - bar_height / 2),
-                        (x2, bar_y - bar_height / 2),
-                        (x2, bar_y + bar_height / 2),
-                        (x1, bar_y + bar_height / 2)]
-            return visual.ShapeStim(
-                win,
-                vertices=vertices,
-                fillColor=fillColor,
-                lineColor=None,
-                closeShape=True
-            )
-
-        progress_bg = visual.ShapeStim(
-            win,
-            vertices=[(left_edge, bar_y - bar_height / 2),
-                      (left_edge + bar_width, bar_y - bar_height / 2),
-                      (left_edge + bar_width, bar_y + bar_height / 2),
-                      (left_edge, bar_y + bar_height / 2)],
-        fillColor='darkgrey',
-        lineColor='white',
-        closeShape=True
-        )
-        progress_bar = create_progress_bar(progress_value)
-
-        # Reusable stimuli
-        fixation_red = visual.TextStim(win, text="+", color="red", height=0.1, pos=(0, 0))
-        fixation = visual.TextStim(win, text="+", color="lightgrey", height=0.1, pos=(0, 0))
-        prompt_sound2 = visual.TextStim(win, text="Press 1 if FIRST sound matches; 2 if SECOND sound matches.",
-                                        color="white", height=0.05, pos=(0, 0))
-        prompt_shape2 = visual.TextStim(win, text="Press 1 if FIRST shape matches; 2 if SECOND shape matches.",
-                                        color="white", height=0.05, pos=(0, 0))
-        img_stim = visual.ImageStim(win, image=None, size=(0.3, 0.4), pos=(0, 0))
-
-        TRIALS_BEFORE_BREAK = 60  
-
-        for trial_index, trial in enumerate(all_trials):
-            if "escape" in event.getKeys():
-                win.close()
-                core.quit()
-            if "s" in event.getKeys(keyList=["s"]):
-                return "skip"
-
-            trial_clock = core.Clock()
-            response = None
-            correct_answer = None
-            order = trial["order"]
-
-            # --- Fixation before stimulus: red if auditory target, grey if visual target ---
-            if trial["trial_type"] in ["auditory_cue", "auditory_only"]:
-                fixation_red.draw()
-            else:
-                fixation.draw()
-            progress_bg.draw()
-            progress_bar.draw()
-            win.flip()
-            core.wait(FIXATION_DURATION)  # always 0.5s
-
-            # --- Trial logic ---
-            if trial["trial_type"] == "visual_cue":
-                # Show shape, then play two sounds (congruent/incongruent, random order)
-                img_stim.image = os.path.join(test_image_dir, trial["cue"])
-                draw_red_border(win, img_stim)
-                img_stim.draw()
-                progress_bg.draw()
-                progress_bar.draw()
-                win.flip()
-                core.wait(STIMULUS_DURATION)  # always 1s
-
-                for i in range(2):
-                    test_sounds[order[i]].play()
-                    core.wait(STIMULUS_DURATION)  # always 1s
-                    if i == 0:
-                        fixation.draw()
-                        progress_bg.draw()
-                        progress_bar.draw()
-                        win.flip()
-                        core.wait(FIXATION_DURATION)  # always 0.5s
-                    else:
-                        core.wait(FIXATION_DURATION)  # always 0.5s
-
-                prompt_sound2.draw()
-                progress_bg.draw()
-                progress_bar.draw()
-                win.flip()
-                trial_clock.reset()
-
-                while trial_clock.getTime() < 4:  # was 5
-                    keys = event.getKeys(keyList=["1", "2", "escape", "s"])
-                    if "escape" in keys:
-                        win.close(); core.quit()
-                    elif "s" in keys:
-                        return "skip"
-                    elif keys:
-                        response = keys[0]
-                        break
-                    core.wait(0.01)
-                if response is None:
-                    response = "NA"
-                reaction_time = round(trial_clock.getTime(), 3)
-                correct_answer = "1" if order[0] == trial["congruent"] else "2"
-
-            elif trial["trial_type"] == "auditory_cue":
-                # Play sound, then show two shapes (congruent/incongruent, random order)
-                show_red_fixation(win)
-                test_sounds[trial["cue"]].play()
-                core.wait(STIMULUS_DURATION)  # always 1s
-
-                for i in range(2):
-                    img_stim.image = os.path.join(test_image_dir, order[i])
-                    img_stim.draw()
-                    progress_bg.draw()
-                    progress_bar.draw()
-                    win.flip()
-                    core.wait(STIMULUS_DURATION)  # always 1s
-                    if i == 0:
-                        fixation.draw()
-                        progress_bg.draw()
-                        progress_bar.draw()
-                        win.flip()
-                        core.wait(FIXATION_DURATION)  # always 0.5s
-                    else:
-                        core.wait(FIXATION_DURATION)  # always 0.5s
-
-                prompt_shape2.draw()
-                progress_bg.draw()
-                progress_bar.draw()
-                win.flip()
-                trial_clock.reset()
-
-                while trial_clock.getTime() < 4:  # was 5
-                    keys = event.getKeys(keyList=["1", "2", "escape", "s"])
-                    if "escape" in keys:
-                        win.close(); core.quit()
-                    elif "s" in keys:
-                        return "skip"
-                    elif keys:
-                        response = keys[0]
-                        break
-                    core.wait(0.01)
-                if response is None:
-                    response = "NA"
-                reaction_time = round(trial_clock.getTime(), 3)
-                correct_answer = "1" if order[0] == trial["congruent"] else "2"
-
-            elif trial["trial_type"] == "auditory_only":
-                # Play sound, then play two sounds (congruent/incongruent, random order)
-                show_red_fixation(win)
-                test_sounds[trial["cue"]].play()
-                core.wait(STIMULUS_DURATION)  # always 1s
-
-                for i in range(2):
-                    test_sounds[order[i]].play()
-                    core.wait(STIMULUS_DURATION)  # always 1s
-                    if i == 0:
-                        fixation.draw()
-                        progress_bg.draw()
-                        progress_bar.draw()
-                        win.flip()
-                        core.wait(FIXATION_DURATION)  # always 0.5s
-                    else:
-                        core.wait(FIXATION_DURATION)  # always 0.5s
-
-                prompt_sound2.draw()
-                progress_bg.draw()
-                progress_bar.draw()
-                win.flip()
-                trial_clock.reset()
-
-                while trial_clock.getTime() < 4:  # was 5
-                    keys = event.getKeys(keyList=["1", "2", "escape", "s"])
-                    if "escape" in keys:
-                        win.close(); core.quit()
-                    elif "s" in keys:
-                        return "skip"
-                    elif keys:
-                        response = keys[0]
-                        break
-                    core.wait(0.01)
-                if response is None:
-                    response = "NA"
-                reaction_time = round(trial_clock.getTime(), 3)
-                correct_answer = "1" if order[0] == trial["congruent"] else "2"
-
-            elif trial["trial_type"] == "visual_only":
-                # Show shape, then show two shapes (congruent/incongruent, random order)
-                img_stim.image = os.path.join(test_image_dir, trial["cue"])
-                draw_red_border(win, img_stim)
-                img_stim.draw()
-                progress_bg.draw()
-                progress_bar.draw()
-                win.flip()
-                core.wait(STIMULUS_DURATION)  # always 1s
-
-                for i in range(2):
-                    img_stim.image = os.path.join(test_image_dir, order[i])
-                    img_stim.draw()
-                    progress_bg.draw()
-                    progress_bar.draw()
-                    win.flip()
-                    core.wait(STIMULUS_DURATION)  # always 1s
-                    if i == 0:
-                        fixation.draw()
-                        progress_bg.draw()
-                        progress_bar.draw()
-                        win.flip()
-                        core.wait(FIXATION_DURATION)  # always 0.5s
-                    else:
-                        core.wait(FIXATION_DURATION)  # always 0.5s
-
-                prompt_shape2.draw()
-                progress_bg.draw()
-                progress_bar.draw()
-                win.flip()
-                trial_clock.reset()
-
-                while trial_clock.getTime() < 4:  # was 5
-                    keys = event.getKeys(keyList=["1", "2", "escape", "s"])
-                    if "escape" in keys:
-                        win.close(); core.quit()
-                    elif "s" in keys:
-                        return "skip"
-                    elif keys:
-                        response = keys[0]
-                        break
-                    core.wait(0.01)
-                if response is None:
-                    response = "NA"
-                reaction_time = round(trial_clock.getTime(), 3)
-                correct_answer = "1" if order[0] == trial["congruent"] else "2"
-
-            # Log results
-            participant_data["reaction time"].append(reaction_time)
-            trial_data = {
-                "trial_index": trial_index,
-                "trial_type": trial["trial_type"],
-                "cue": trial["cue"],
-                "congruent": trial["congruent"],
-                "incongruent": trial["incongruent"],
-                "order": order,
-                "correct_answer": correct_answer,
-                "response": response,
-                "reaction_time": reaction_time,
-            }
-            participant_data["block3_test_log"].append(trial_data)
-
-            # Update progress bar
-            progress_value += 1.0 / total_trials
-            progress_bar = create_progress_bar(progress_value)
-
-            # Break every 60 trials
-            if (trial_index + 1) % TRIALS_BEFORE_BREAK == 0 and (trial_index + 1) < total_trials:
-                break_msg = visual.TextStim(win, text="You may take a short break.\n\nPress SPACEBAR to continue.",
-                                            color="lightgrey", height=0.06, pos=(0, 0))
-                break_msg.draw()
-                win.flip()
-                keys = event.waitKeys(keyList=["space", "s"])
-                if "s" in keys:
-                    return "skip"
-                progress_bar = create_progress_bar(progress_value)
-
-        # End of block
-        end_msg = visual.TextStim(
-            win,
-            text="You have completed the experiment.\n\nPress SPACEBAR to continue.",
-            color="lightgrey", height=0.06,
-            pos=(0, 0)
-        )
-        end_msg.draw()
-        win.flip()
-        keys = event.waitKeys(keyList=["space", "s"])
-        if "s" in keys:
-            return "skip"
-
-        print("Block 3 completed successfully.")
-        return "done"
-
-    except Exception as e:
-        print("Error during Block 3:")
-        traceback.print_exc()
-        core.quit()
-
-# --- Debug skip all blocks and go to survey ---
-if DEBUG_SKIP_TO_BLOCK3 and DEBUG_SKIP_BLOCK3:
-    print("DEBUG: Skipping all blocks, proceeding to survey and end screen.")
-    run_end_survey()
-    show_end_screen()
-    # Optionally save empty logs for completeness
-    save_block1_crossmodal_to_excel()
-    save_block2_unimodal_to_excel()
-    save_block3_test_to_excel()
-    win.close()
-    core.quit()
-
-# --- Counterbalanced workflow ---
-
-if DEBUG_SKIP_TO_BLOCK3:
-    print("DEBUG: Skipping directly to block 3 (testing block).")
-    if DEBUG_SKIP_BLOCK3:
-        print("DEBUG: Skipping block 3 entirely, proceeding to survey and end screen.")
-        run_end_survey()
-        show_end_screen()
-        # Optionally save empty block 1 and 2 logs for completeness
-        save_block1_crossmodal_to_excel()
-        save_block2_unimodal_to_excel()
-        save_block3_test_to_excel()
-        win.close()
-        core.quit()
-    else:
-        result = block3_testing()
-        if result == "skip":
-            win.close(); core.quit()
-        save_block3_test_to_excel()
-        run_end_survey()
-        show_end_screen()
-        # Optionally save empty block 1 and 2 logs for completeness
-        save_block1_crossmodal_to_excel()
-        save_block2_unimodal_to_excel()
-        save_block3_test_to_excel()
-        win.close()
-        core.quit()
 
 # Use participant_id for automatic counterbalancing - even digiit = order 1, odd digit = order 2
 last_char = participant_id.strip()[-1] if participant_id.strip() else "0"
@@ -2296,11 +1866,15 @@ if order_key == "1":
 
     #run_practice_trials(win, participant_id)
 
-    result = block2_unimodal()
+    result = unimodal_with_feedback()
     if result == "skip":
         win.close(); core.quit()
-    save_block2_unimodal_to_excel()
-    # same order every time, not interleaved
+    save_unimodal_with_feedback_to_excel()
+
+    result = unimodal_no_feedback()
+    if result == "skip":
+        win.close(); core.quit()
+    save_unimodal_no_feedback_to_excel()
 
     result = crossmodal_no_feedback()
     if result == "skip":
@@ -2312,27 +1886,30 @@ elif order_key == "2":
 
     #run_practice_trials(win, participant_id)
 
-    result = block1_crossmodal()
+    result = crossmodal_with_feedback()
     if result == "skip":
         win.close(); core.quit()
-    save_block1_crossmodal_to_excel()
-    # fixation cross appears before shape, should that time be factored into the testing trials that have fixation instead of feedback?
+    save_crossmodal_with_feedback_to_excel()
+
+    result = crossmodal_no_feedback()
+    if result == "skip":
+        win.close(); core.quit()
+    save_crossmodal_no_feedback_to_excel()
 
     result = unimodal_no_feedback()
     if result == "skip":
         win.close(); core.quit()
     save_unimodal_no_feedback_to_excel()
-    # exactly the same order every time, and not interleaved properly
+
 
 
 # --- End workflow ---
-
 run_end_survey()
 show_end_screen()
 
 # Save data after each block (redundant, but safe)
-save_block1_crossmodal_to_excel()
-save_block2_unimodal_to_excel()
+save_crossmodal_with_feedback_to_excel()
+save_unimodal_with_feedback_to_excel()
 save_crossmodal_no_feedback_to_excel()
 save_unimodal_no_feedback_to_excel()
 
