@@ -154,58 +154,90 @@ def prompt_practice_response(win, text="Press 1 for FIRST, 2 for SECOND."):
 def run_av_practice(win, stimuli):
     wait_for_space(win, "Mixed Trial: Press SPACE to begin.")
     
-    show_practice_visual_until_space(win, stimuli["visual"]["target"], with_border=True)
-    wait_for_space(win, "This is the target shape.")
-    show_practice_fixation(win)
+    # Show target shape
+    img_stim = visual.ImageStim(win, image=stimuli["visual"]["target"], size=(0.3, 0.4), pos=(0, 0))
+    draw_red_border(win, img_stim)
+    img_stim.draw()
+    win.flip()
+    core.wait(STIMULUS_DURATION)
 
-    options = [stimuli["audio"]["target"], stimuli["audio"]["distractor"]]
-    random.shuffle(options)
-    correct = "1" if options[0] == stimuli["audio"]["target"] else "2"
+    # Show fixation cross
+    fixation = visual.TextStim(win, text="+", color="lightgrey", height=0.1, pos=(0, 0))
+    fixation.draw()
+    win.flip()
+    core.wait(0.5)
 
-    for snd in options:
-        show_practice_fixation(win)
-        snd.play()
-        core.wait(1.0)
+    # Show first sound with fixation on the left
+    fixation.pos = (-0.4, 0)
+    fixation.draw()
+    win.flip()
+    stimuli["audio"]["target"].play()
+    core.wait(STIMULUS_DURATION)
 
-    response = prompt_practice_response(win, "Press 1 if FIRST sound matches; 2 if SECOND.")
+    # Show fixation cross
+    fixation.pos = (0, 0)
+    fixation.draw()
+    win.flip()
+    core.wait(0.5)
+
+    # Show second sound with fixation on the right
+    fixation.pos = (0.4, 0)
+    fixation.draw()
+    win.flip()
+    stimuli["audio"]["distractor"].play()
+    core.wait(STIMULUS_DURATION)
+
+    # Prompt for response
+    prompt = visual.TextStim(win, text="Press 1 if FIRST sound matches; 2 if SECOND.", color="lightgrey", height=0.05)
+    prompt.draw()
+    win.flip()
+    response = prompt_practice_response(win)
+    correct = "1" if stimuli["audio"]["target"] == stimuli["audio"]["target"] else "2"
     show_practice_feedback(win, response == correct)
 
 def run_aa_practice(win, stimuli):
     wait_for_space(win, "Shape/Sound Trials: Press SPACE to begin.")
 
-    show_practice_visual_until_space(win, stimuli["visual"]["target"], with_border=True)
-    wait_for_space(win, "This is the target shape.")
-    show_practice_fixation(win)
+    # Show target shape
+    img_stim = visual.ImageStim(win, image=stimuli["visual"]["target"], size=(0.3, 0.4), pos=(0, 0))
+    draw_red_border(win, img_stim)
+    img_stim.draw()
+    win.flip()
+    core.wait(STIMULUS_DURATION)
 
-    options = [stimuli["visual"]["associated"], stimuli["visual"]["distractor"]]
-    random.shuffle(options)
-    correct_visual = "1" if options[0] == stimuli["visual"]["associated"] else "2"
+    # Show fixation cross
+    fixation = visual.TextStim(win, text="+", color="lightgrey", height=0.1, pos=(0, 0))
+    fixation.draw()
+    win.flip()
+    core.wait(0.5)
 
-    for img_path in options:
-        show_practice_visual(win, img_path)
-        show_practice_fixation(win)
+    # Show first shape on the left
+    img_stim.image = stimuli["visual"]["associated"]
+    img_stim.pos = (-0.4, 0)
+    img_stim.draw()
+    win.flip()
+    core.wait(STIMULUS_DURATION)
 
-    response_visual = prompt_practice_response(win, "Press 1 if FIRST shape matches; 2 if SECOND.")
-    show_practice_feedback(win, response_visual == correct_visual)
+    # Show fixation cross
+    fixation.pos = (0, 0)
+    fixation.draw()
+    win.flip()
+    core.wait(0.5)
 
-    wait_for_space(win, "Now you'll hear the target sound.\n\nPress SPACE to continue.")
-    show_practice_fixation(win, red=True)
-    stimuli["audio"]["target"].play()
-    core.wait(1.0)
+    # Show second shape on the right
+    img_stim.image = stimuli["visual"]["distractor"]
+    img_stim.pos = (0.4, 0)
+    img_stim.draw()
+    win.flip()
+    core.wait(STIMULUS_DURATION)
 
-    wait_for_space(win, "Next you will hear two sounds.\n\nPress SPACE to continue.")
-    show_practice_fixation(win)
-    options = [stimuli["audio"]["associated"], stimuli["audio"]["distractor"]]
-    random.shuffle(options)
-    correct_audio = "1" if options[0] == stimuli["audio"]["associated"] else "2"
-
-    for snd in options:
-        show_practice_fixation(win)
-        snd.play()
-        core.wait(1.0)
-
-    response_audio = prompt_practice_response(win, "Press 1 if FIRST sound matches; 2 if SECOND.")
-    show_practice_feedback(win, response_audio == correct_audio)
+    # Prompt for response
+    prompt = visual.TextStim(win, text="Press 1 if FIRST shape matches; 2 if SECOND.", color="lightgrey", height=0.05)
+    prompt.draw()
+    win.flip()
+    response = prompt_practice_response(win)
+    correct = "1" if stimuli["visual"]["associated"] == stimuli["visual"]["associated"] else "2"
+    show_practice_feedback(win, response == correct)
 
 def run_practice_trials(win, participant_id):
     """Run practice trials with order counterbalanced by participant_id."""
@@ -778,14 +810,12 @@ def crossmodal_with_feedback():
                 break_msg = visual.TextStim(
                     win,
                     text=(f"You may take a 30 second break.\n\n"
-                          "Press SPACEBAR when you are ready to continue."),
+                          "The experiment will continue automatically."),
                     color="lightgrey", height=0.06, pos=(0, 0)
                 )
                 break_msg.draw()
                 win.flip()
-                keys = event.waitKeys(keyList=["space", "s"])
-                if "s" in keys:
-                    return "skip"
+                core.wait(30)  # Automatically continue after 30 seconds
                 progress_bar = create_progress_bar(progress_value)
 
         end_msg = visual.TextStim(
@@ -1037,14 +1067,12 @@ def crossmodal_no_feedback():
                 break_msg = visual.TextStim(
                     win,
                     text=(f"You may take a 30 second break.\n\n"
-                          "Press SPACEBAR when you are ready to continue."),
+                          "The experiment will continue automatically."),
                     color="lightgrey", height=0.06, pos=(0, 0)
                 )
                 break_msg.draw()
                 win.flip()
-                keys = event.waitKeys(keyList=["space", "s"])
-                if "s" in keys:
-                    return "skip"
+                core.wait(30)  # Automatically continue after 30 seconds
                 progress_bar = create_progress_bar(progress_value)
 
         end_msg = visual.TextStim(
@@ -1098,19 +1126,17 @@ def baseline_crossmodal():
         print("Entering trial loop for baseline crossmodal...")
         local_stimuli = list(stimuli_pairs)
         crossmodal_trials = []
-        # Each of the 6 pairs appears 4 times: 2 with correct sound first, 2 with it second
-        for img_file, audio_file in local_stimuli:
-            available_tones = [snd for _, snd in local_stimuli if snd != audio_file]
-            for _ in range(2):
-                # Correct sound first
+        # === Build 48 crossmodal trials ===
+        for img_file, audio_file in stimuli_pairs:
+            available_tones = [snd for _, snd in stimuli_pairs if snd != audio_file]
+            for _ in range(4):  # Repeat each pair 4 times
+                # Congruent first
                 incorrect_tone = random.choice(available_tones)
                 crossmodal_trials.append((img_file, audio_file, [audio_file, incorrect_tone]))
-
-                # Correct sound second
+                # Congruent second
                 incorrect_tone = random.choice(available_tones)
                 crossmodal_trials.append((img_file, audio_file, [incorrect_tone, audio_file]))
-
-        random.shuffle(crossmodal_trials)  # 6 × 4 = 24 trials total
+        random.shuffle(crossmodal_trials)  # 6 × 8 = 48 trials total
 
         correct_feedback = visual.ImageStim(win, image="green_tick.png", size=(0.2, 0.2), pos=(0, 0))
         incorrect_feedback = visual.ImageStim(win, image="red_cross.png", size=(0.2, 0.2), pos=(0, 0))
@@ -1288,14 +1314,12 @@ def baseline_crossmodal():
                 break_msg = visual.TextStim(
                     win,
                     text=(f"You may take a 30 second break.\n\n"
-                          "Press SPACEBAR when you are ready to continue."),
+                          "The experiment will continue automatically."),
                     color="lightgrey", height=0.06, pos=(0, 0)
                 )
                 break_msg.draw()
                 win.flip()
-                keys = event.waitKeys(keyList=["space", "s"])
-                if "s" in keys:
-                    return "skip"
+                core.wait(30)  # Automatically continue after 30 seconds
                 progress_bar = create_progress_bar(progress_value)
 
         end_msg = visual.TextStim(
@@ -1693,14 +1717,12 @@ def unimodal_with_feedback():
             break_msg = visual.TextStim(
                 win,
                 text=(f"You may take a 30 second break.\n\n"
-                      "Press SPACEBAR when you are ready to continue."),
+                      "The experiment will continue automatically."),
                 color="lightgrey", height=0.06, pos=(0, 0)
             )
             break_msg.draw()
             win.flip()
-            keys = event.waitKeys(keyList=["space", "s"])
-            if "s" in keys:
-                return "skip"
+            core.wait(30)  # Automatically continue after 30 seconds
             progress_bar = create_progress_bar(progress_value)
 
     end_msg = visual.TextStim(
@@ -2079,14 +2101,12 @@ def unimodal_no_feedback():
             break_msg = visual.TextStim(
                 win,
                 text=(f"You may take a 30 second break.\n\n"
-                      "Press SPACEBAR when you are ready to continue."),
+                      "The experiment will continue automatically."),
                 color="lightgrey", height=0.06, pos=(0, 0)
             )
             break_msg.draw()
             win.flip()
-            keys = event.waitKeys(keyList=["space", "s"])
-            if "s" in keys:
-                return "skip"
+            core.wait(30)  # Automatically continue after 30 seconds
             progress_bar = create_progress_bar(progress_value)
 
     end_msg = visual.TextStim(
@@ -2119,7 +2139,7 @@ def baseline_unimodal():
         "2. Sound trials: Hear a target sound → then two options\n\n"
         "When asked to do so:\n"
         "• Press ‘1’ if the FIRST option matches the target\n"
-        "• Press ‘2’ if the SECOND option matches\n\n"
+        "• Press ‘2’ if the SECOND option matches the target\n\n"
         "Please wait until you're asked before responding.\n\n"
         "You will NOT get feedback.\n\n"
         "Press SPACEBAR to begin.",
@@ -2133,42 +2153,30 @@ def baseline_unimodal():
 
     # Prepare trial lists using explicit pairings
     visual_only_trials = []
-    # === Build 24 visual-only trials ===
-    visual_only_trials = []
+    # === Build 48 visual-only trials ===
     for v in visual_shape_pairs:
         distractors = [f for f in [vv[1] for vv in visual_shape_pairs] if f != v[1]]
-        for _ in range(2):
+        for _ in range(8):  # Repeat each pair 8 times
             # Congruent first
             distractor = random.choice(distractors)
             visual_only_trials.append(("visual", v[0], v[1], [v[1], distractor]))
             # Congruent second
             distractor = random.choice(distractors)
             visual_only_trials.append(("visual", v[0], v[1], [distractor, v[1]]))
-    # === Build 24 auditory-only trials ===
+    # === Build 48 auditory-only trials ===
     auditory_only_trials = []
     for a in auditory_sound_pairs:
         distractors = [f for f in [aa[1] for aa in auditory_sound_pairs] if f != a[1]]
-        for _ in range(2):
+        for _ in range(8):  # Repeat each pair 8 times
             # Congruent first
             distractor = random.choice(distractors)
             auditory_only_trials.append(("auditory", a[0], a[1], [a[1], distractor]))
             # Congruent second
             distractor = random.choice(distractors)
             auditory_only_trials.append(("auditory", a[0], a[1], [distractor, a[1]]))
-    # Make sure both trial lists are the same length
-    min_length = min(len(visual_only_trials), len(auditory_only_trials))
-    visual_only_trials = visual_only_trials[:min_length]
-    auditory_only_trials = auditory_only_trials[:min_length]
-
-    # Shuffle each list independently
-    random.shuffle(visual_only_trials)
-    random.shuffle(auditory_only_trials)
-
-    # Interleave strictly 1:1
-    if random.choice([True, False]):
-        unimodal_trials = [item for pair in zip(visual_only_trials, auditory_only_trials) for item in pair]
-    else:
-        unimodal_trials = [item for pair in zip(auditory_only_trials, visual_only_trials) for item in pair]
+    # Combine visual and auditory trials for a total of 96 trials
+    unimodal_trials = visual_only_trials + auditory_only_trials
+    random.shuffle(unimodal_trials)
 
     # Optional sanity check
     for i in range(1, len(unimodal_trials)):
@@ -2450,14 +2458,12 @@ def baseline_unimodal():
             break_msg = visual.TextStim(
                 win,
                 text=(f"You may take a 30 second break.\n\n"
-                      "Press SPACEBAR when you are ready to continue."),
+                      "The experiment will continue automatically."),
                 color="lightgrey", height=0.06, pos=(0, 0)
             )
             break_msg.draw()
             win.flip()
-            keys = event.waitKeys(keyList=["space", "s"])
-            if "s" in keys:
-                return "skip"
+            core.wait(30)  # Automatically continue after 30 seconds
             progress_bar = create_progress_bar(progress_value)
 
     end_msg = visual.TextStim(
@@ -2486,7 +2492,7 @@ participant_data["order"] = order_key
 if order_key == "1":
     # Unimodal with feedback -> Crossmodal with no feedback
 
-    #run_practice_trials(win, participant_id)
+    run_practice_trials(win, participant_id)
 
     result = baseline_crossmodal()
     save_baseline_crossmodal_to_excel
@@ -2508,7 +2514,7 @@ if order_key == "1":
 
 elif order_key == "2":
     # Crossmodal with feedback -> Unimodal with no feedback
-
+    
     run_practice_trials(win, participant_id)
 
     result = baseline_unimodal()
@@ -2528,8 +2534,6 @@ elif order_key == "2":
     if result == "skip":
         win.close(); core.quit()
     save_unimodal_no_feedback_to_excel()
-
-
 
 # --- End workflow ---
 run_end_survey()
