@@ -47,24 +47,14 @@ def spectral_centroid(x, sr):
 
 # -------------- FORMANT & TIMBRE PROFILES --------------
 formant_profiles = [
-    {"label": "formant_1", "formants": [800, 1800]},
-    {"label": "formant_2", "formants": [700, 1600]},
-    {"label": "formant_3", "formants": [600, 1400]},
-    {"label": "formant_4", "formants": [500, 1200]},
-    {"label": "formant_5", "formants": [400, 1000]},
-    {"label": "formant_6", "formants": [300, 800]},
+    {"label": f"formant_{i+1}", "formants": [300 + i * 100, 800 + i * 200]} for i in range(10)
 ]
 
 timbre_profiles = [
-    {"label": "timbre_1", "amps": [1.0, 0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5, 0.45]},
-    {"label": "timbre_2", "amps": [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.15, 0.1, 0.05]},
-    {"label": "timbre_3", "amps": [1.0, 0.85, 0.7, 0.55, 0.4, 0.25, 0.15, 0.1, 0.07, 0.05, 0.03, 0.01]},
-    {"label": "timbre_4", "amps": [1.0, 0.8, 0.6, 0.4, 0.2, 0.1, 0.05, 0.03, 0.02, 0.01, 0.005, 0.002]},
-    {"label": "timbre_5", "amps": [1.0] + [0.1]*11},
-    {"label": "timbre_6", "amps": [1.0 / h for h in range(1, 13)]},
+    {"label": f"timbre_{i+1}", "amps": [1.0 / (h + i * 0.1) for h in range(1, 13)]} for i in range(10)
 ]
 
-assert len(formant_profiles) == len(timbre_profiles) == 6, "Need 6 formant/timbre pairs"
+assert len(formant_profiles) == len(timbre_profiles) == 10, "Need 10 formant/timbre pairs"
 
 # ---------------- SYNTHESIS LOOP ----------------
 os.makedirs(OUT_DIR, exist_ok=True)
