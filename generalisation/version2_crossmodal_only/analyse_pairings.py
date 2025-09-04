@@ -5,7 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # ----------------- config -----------------
-PARTICIPANT_ID = "3"  # change if needed
+PARTICIPANT_ID = "4"  # change if needed
 BASE = Path("participant_data") / PARTICIPANT_ID
 FP1 = BASE / "free_pairings_1.xlsx"   # BEFORE
 FP2 = BASE / "free_pairings_2.xlsx"   # AFTER

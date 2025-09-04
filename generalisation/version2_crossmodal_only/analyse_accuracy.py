@@ -5,7 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # ========== CONFIG ==========
-PARTICIPANT_ID = "3"   # change as needed
+PARTICIPANT_ID = "4"   # change as needed
 BIN_SIZE = 10
 BASE = Path("participant_data") / PARTICIPANT_ID
 
