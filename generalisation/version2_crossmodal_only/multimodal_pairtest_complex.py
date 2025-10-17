@@ -919,7 +919,7 @@ main_sounds = preload_sounds(audio_dir)
 # === Experiment flow ===
 
 # Triplets block testing
-triplets_block_sounds()
+triplets_block_shapes()
 
 # Free Pairing — Block 1 (welcome text)
 intro_text_block1 = (
