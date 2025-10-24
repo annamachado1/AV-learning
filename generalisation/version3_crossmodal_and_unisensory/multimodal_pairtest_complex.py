@@ -17,6 +17,10 @@ from psychopy import visual, core, event, sound
 ##### Second free-pairing block uses a different intro text; the two free-pairing outputs save to different filenames.
 ##### Response keys in the crossmodal block are now: '1' (FIRST, left index finger) and '0' (SECOND, right index finger).
 
+from psychopy import logging
+logging.console.setLevel(logging.ERROR)  # suppresses certain warnings
+import warnings
+warnings.filterwarnings("ignore", message="elementwise comparison failed")
 
 # === Collect participant ID and set up directories before anything else ===
 def get_participant_id():
@@ -66,6 +70,25 @@ def save_crossmodal_with_feedback_to_excel():
     excel_filename = os.path.join(participant_folder, "crossmodal_wf_log.xlsx")
     df.to_excel(excel_filename, index=False)
     print(f"Crossmodal with feedback data saved to {excel_filename}")
+
+def save_unimodal_to_excel(matrix, filename):
+    try:
+        participant_folder = os.path.join("./participant_data", participant_data["participant_id"])
+        os.makedirs(participant_folder, exist_ok=True)
+
+        # Convert matrix to DataFrame
+        df = pd.DataFrame(matrix)
+
+        # Construct full file path
+        excel_filename = os.path.join(participant_folder, filename)
+
+        # Attempt to save
+        df.to_excel(excel_filename, index=False, header=False)
+        print(f"Matrix data successfully saved to {excel_filename}")
+
+    except Exception as e:
+        print(f"Could not save matrix to Excel ({e}). Printing data instead:\n")
+        print(np.array(matrix))
 
 # === End-of-experiment survey ===
 def run_end_survey():
@@ -135,9 +158,7 @@ def run_end_survey():
         print(f"Could not save survey to Excel: {e}")
 
 # === Advanced end of survey experiment ===
-def run_end_survey_adv():
-    print("Running advanced end survey...")
-    
+def run_end_survey_adv():    
     survey_questions = [
         "Which features of the shapes did you focus on to help with learning?",
         "Which features of the sounds did you focus on to help with learning?",
@@ -387,6 +408,7 @@ def free_pairings_block(intro_text):
             tone_clicked = next((t for t in tones if t["stim"].contains(mouse)), None)
 
             if tone_clicked is not None:
+                tone_sounds[tone_clicked["file"]].stop()
                 tone_sounds[tone_clicked["file"]].play()
                 selected_tone = tone_clicked
             elif selected_tone is not None:
@@ -427,14 +449,14 @@ def free_pairings_block(intro_text):
     win.flip()
     return 'done'
 
-# === Calculate the difficulty of an individual trial ===
+# === Helper function for caluclating difficylty of a crossmodal trial ===
 def crossWF_calc_trial_diff(sound1,sound2):
     idx1 = int(sound1.split('_')[1].split('.')[0])
     idx2 = int(sound2.split('_')[1].split('.')[0])
     difficulty = 9 - abs(idx1 - idx2)
     return difficulty
 
-# === Pick an incorrect tone for crossmodal with feedback trials ===
+# === Helper function for making crossmodal with feedback trials ===
 def crossWF_pick_incorrect_tone(correct_tone, available_tones, current_diff, trial_num):
     attempts = 0
     while attempts < 30: # avoid infinite loops
@@ -613,13 +635,58 @@ def crossmodal_with_feedback():
         traceback.print_exc()
         core.quit()
 
-# === Triplets blocks ===
-def triplets_block_shapes():
-    # Presents triplets of shapes, participants seletc one that does not belong
+# === Triplets block == 
+# the main fucnction calls the two triplets blocks in an order based on participant ID
+def unisensory_triplets_block():
+    numtrials = 10 # must be a multiple of 10 
+    participant_num = int(participant_id)
+    if participant_num % 2 == 0:
+        diffcounts_shapes = triplets_block_shapes(numtrials)
+        save_unimodal_to_excel(diffcounts_shapes,"unimodal_shapes.xlsx")
+        diffcounts_sounds = triplets_block_sounds(numtrials)
+        save_unimodal_to_excel(diffcounts_sounds,"unimodal_sounds.xlsx")
+    else:
+        diffcounts_sounds = triplets_block_sounds(numtrials)
+        save_unimodal_to_excel(diffcounts_sounds,"unimodal_sounds.xlsx")
+        diffcounts_shapes = triplets_block_shapes(numtrials)
+        save_unimodal_to_excel(diffcounts_shapes,"unimodal_shapes.xlsx")
+
+def triplets_block_shapes(numtrials):
+    # Setup
+    img_stim_left = visual.ImageStim(win, image=None, size=(0.3, 0.4), pos=(-0.5, 0))
+    img_stim_center = visual.ImageStim(win, image=None, size=(0.3, 0.4), pos=(0, 0))
+    img_stim_right = visual.ImageStim(win, image=None, size=(0.3, 0.4), pos=(0.5, 0))
+    mouse = event.Mouse(win=win)
+
+    diff_cts =  np.zeros((10,10), dtype=int)
+    
+    all_shapes = [pair[0] for pair in stimuli_pairs]
+    image_path_list = []
+    for img_file in all_shapes:
+        image_path_list.append(os.path.join(image_dir, img_file))
+
+    instructions = visual.TextStim(
+        win,
+        text="Pick The Shape That You Think Doesn't Belong",
+        pos=(0, 0.55),
+        height=0.08,
+        color="lightgray",
+        wrapWidth=1.4,
+        alignText="center",
+    )
+    
+    # Make the trials
+    trial_list = []
+    item_uses = np.zeros((10), dtype=int)
+    for _ in range(numtrials):
+        trial, item_uses = pick_triplet_trial(item_uses)
+        trial_list.append(trial)
+
+    # Show instructions
     instr_result = show_instructions(
-        "INSTRUCTIONS – Triplets Block\n\n"
-        "In this section you will be presented with three shapes.\n\n"
-        "Click on the shape you feel is the odd on out.\n\n"
+        "INSTRUCTIONS\n\n"
+        "In this section you will be presented with three shapes.\n"
+        "Click on the shape you feel is the odd on out.\n"
         "Press SPACEBAR to continue.",
         ["space"]
     )
@@ -627,45 +694,45 @@ def triplets_block_shapes():
         print("Triplets shapes block skipped.")
         return "skip"
     
-    numshapes = 10
-    numtrials = 2
+    # Make the progress bar
+    cx, cy = 0, -0.6
+    finalwidth = 1.4
+    left = cx - (finalwidth / 2)
+    progress_bar = visual.Rect(
+        win,
+        width=0, height=0.05,  # start at 0%
+        pos=(cx, cy),
+        lineColor="white", fillColor="white",
+        autoDraw=False, name="progressbar"
+    )
 
-    diff_cts = np.zeros((numshapes,numshapes), dtype=int) 
-    uses = np.zeros((numshapes), dtype=int)   
-    trial_list = [] # List of tuples of 3 shape indices
-    
-    all_shapes = [pair[0] for pair in stimuli_pairs]
-    image_path_list = []
-    for img_file in all_shapes:
-        image_path_list.append(os.path.join(image_dir, img_file))
-
-    # Pick 30 trials
-    for _ in range(numtrials):
-        trial, uses = pick_triplet_trial(uses)
-        trial_list.append(trial)
-    
-    img_stim_left = visual.ImageStim(win, image=None, size=(0.3, 0.4), pos=(-0.5, 0))
-    img_stim_center = visual.ImageStim(win, image=None, size=(0.3, 0.4), pos=(0, 0))
-    img_stim_right = visual.ImageStim(win, image=None, size=(0.3, 0.4), pos=(0.5, 0))
-    mouse = event.Mouse(win=win)
-
-    for trial in trial_list:
+    for idx, trial in enumerate(trial_list):
         event.clearEvents()
         if "escape" in event.getKeys(keyList=["escape"]):
             win.close()
             core.quit()
         if "s" in event.getKeys(keyList=["s"]):
-            return "skip"
+            return "skip" 
         
+        instructions.draw()
+        instructions.autoDraw = True
+
         # 1) Draw all shapes
         img_stim_left.image = image_path_list[trial[0]]
         img_stim_center.image = image_path_list[trial[1]]
         img_stim_right.image = image_path_list[trial[2]]
-        img_stim_left.draw()
-        img_stim_center.draw()
-        img_stim_right.draw()
+        img_stim_left.autoDraw = True
+        img_stim_center.autoDraw = True
+        img_stim_right.autoDraw = True
         win.flip()
-            
+
+        progress = idx / float(numtrials - 1)  # progress fraction (0–1)
+        width = finalwidth * progress
+        progress_bar.width = width
+        progress_bar.pos = (left + width/2,cy)
+        progress_bar.autoDraw = True
+        win.flip()
+
         # Response, print the selected shape index
         trial_clock = core.Clock()
         mouse.clickReset()
@@ -703,7 +770,7 @@ def triplets_block_shapes():
                     diff_cts[result[0], result[2]] += 1
                     diff_cts[result[2], result[0]] += 1
 
-                    diff_cts[result[1], result[2]] -= 1
+                    diff_cts[result[1], result[2]]-= 1
                     diff_cts[result[2], result[1]] -= 1   
                     break  # move to next trial
 
@@ -712,8 +779,12 @@ def triplets_block_shapes():
         if clicked_index is None:
             pass
 
-    print("Diff counts matrix:")
-    print(diff_cts)
+    progress_bar.autoDraw = False
+    instructions.autoDraw = False
+    img_stim_left.autoDraw = False
+    img_stim_center.autoDraw = False
+    img_stim_right.autodraw = False
+
     end_msg = visual.TextStim(
         win,
         text="You have completed this block.\n\nPress SPACEBAR to continue.",
@@ -725,33 +796,67 @@ def triplets_block_shapes():
     event.waitKeys(keyList=["space"])
 
     print("Triplets block completed successfully.")
-    return "done"
+    return diff_cts
 
-def triplets_block_sounds():
+def triplets_block_sounds(numtrials):
+    # Setup
+    all_sounds = [pair[1] for pair in stimuli_pairs]
+    diff_cts = np.zeros((10,10), dtype=int) 
+    
+    # Make the trials
+    uses = np.zeros((10), dtype=int)
+    trial_list = []
+    for _ in range(numtrials):
+        trial, uses = pick_triplet_trial(uses)
+        trial_list.append(trial)
+    
+    # Show instructions
     instr_result = show_instructions(
-        "INSTRUCTIONS – Triplets (Sounds)\n\n"
-        "You will see three buttons: Sound 1, Sound 2, and Sound 3.\n"
-        "Click the button for the sound that you think is the odd one out.\n\n"
+        "INSTRUCTIONS\n\n"
+        "You will hear three sounds.\n"
+        "Click the sound that you think is the odd one out.\n"
         "Press SPACEBAR to continue.",
         ["space"]
     )
     if instr_result == "s":
         print("Triplets (sounds) block skipped.")
         return "skip"
+    
+    # Build three clicable music notes
+    def note_left():
+        return visual.ImageStim(
+            win,
+            image="musical_note.png",
+            pos=(-0.5, 0),
+            size=(0.18, 0.18),
+            name="note_left"
+    )
 
-    numsounds = 10  
-    numtrials = 3
-    all_sounds = [pair[1] for pair in stimuli_pairs]
-    diff_cts = np.zeros((numsounds,numsounds), dtype=int) 
-    uses = np.zeros((numsounds), dtype=int)
-    trial_list = []
+    def note_center():
+        return visual.ImageStim(
+            win,
+            image="musical_note.png",
+            pos=(0.0, 0),
+            size=(0.18, 0.18),
+            name="note_center"
+        )
 
-    # Pick 30 trials
-    for _ in range(numtrials):
-        trial, uses = pick_triplet_trial(uses)
-        trial_list.append(trial)
+    def note_right():
+        return visual.ImageStim(
+            win,
+            image="musical_note.png",
+            pos=(0.5, 0),
+            size=(0.18, 0.18),
+            name="note_right"
+        )
 
-    # Build three clickable buttons
+    # Create the notes
+    note1 = note_left()
+    note2 = note_center()
+    note3 = note_right()
+    notes = [note1, note2, note3]
+
+    # Build the replay button
     def button(label, center_pos, color):
         padding = (0.14, 0.05)
         w, h = padding[0] * 2.4, padding[1] * 2.4
@@ -759,87 +864,164 @@ def triplets_block_sounds():
         text = visual.TextStim(win, text=label, pos=center_pos, height=0.06, color="white")
         return rect, text
     
-    # Makes the buttons
-    one_rect, one_text = button("Sound 1", (-0.5, 0.3), "#BFBFBF")
-    two_rect, two_text = button("Sound 2", (0, 0.3), "#BFBFBF") #Sound buttons
-    three_rect, three_text = button("Sound 3", (0.5, 0.3), "#BFBFBF")
+    # Makes the Replay buttons
+    rone_rect, rone_text = button("Replay", (-0.5, -0.3), "#4C7BF1")
+    rtwo_rect, rtwo_text = button("Replay", (0, -0.3), "#4C7BF1") #Replay buttons
+    rthree_rect, rthree_text = button("Replay", (0.5, -0.3), "#4C7BF1")
 
-    rone_rect, rone_text = button("Replay Sound 1", (-0.5, -0.3), "#4C7BF1")
-    rtwo_rect, rtwo_text = button("Replay Sound 2", (0, -0.3), "#4C7BF1") #Replay buttons
-    rthree_rect, rthree_text = button("Replay Sound 3", (0.5, -0.3), "#4C7BF1")
+    # Define the instructions
+    instructions = visual.TextStim(
+        win,
+        text="Pick The Sound That You Think Doesn't Belong",
+        pos=(0, 0.55),
+        height=0.08,
+        color="lightgray",
+        wrapWidth=1.4,
+        alignText="center",
+    )
+
+    # Make the progress bar
+    cx, cy = 0, -0.6
+    finalwidth = 1.4
+    left = cx - (finalwidth / 2)
+    progress_bar = visual.Rect(
+        win,
+        width=0, height=0.05,  # start at 0%
+        pos=(cx, cy),
+        lineColor="white", fillColor="white",
+        autoDraw=False, name="progressbar"
+    )
 
     mouse = event.Mouse(win=win)
 
     # Trial loop
-    for trial in trial_list:
+    for idx, trial in enumerate(trial_list):
         event.clearEvents()
         mouse.clickReset()
         if "escape" in event.getKeys(keyList=["escape"]):
             win.close(); core.quit()
         if "s" in event.getKeys(keyList=["s"]):
             return "skip"
+    
+        # Draw notes
+        for n in notes:
+            n.draw()
+            n.autoDraw = True
+
+        # Draw Progress Bar
+        progress = idx / float(numtrials - 1)  # progress fraction (0–1)
+        width = finalwidth * progress
+        progress_bar.width = width
+        progress_bar.pos = (left + width/2,cy)
+        progress_bar.autoDraw = True
+        win.flip()
         
-        # Sound 1
+        # Write Instructions
+        instructions.draw()
+        instructions.autoDraw = True
+
+        # Play sounds and highlight notes
         main_sounds[all_sounds[trial[0]]].stop()
         main_sounds[all_sounds[trial[0]]].play()
-        one_rect.draw(); one_text.draw()
+        highlight = highlight_note(notes[0])
+        highlight.draw()
+        notes[0].draw()
         win.flip()
-        core.wait(STIMULUS_DURATION + 0.4)  # sound duration + brief pause
+        core.wait(STIMULUS_DURATION + 0.4)
 
-        # Sound 2
         main_sounds[all_sounds[trial[1]]].stop()
         main_sounds[all_sounds[trial[1]]].play()
-        two_rect.draw(); two_text.draw()
+        highlight = highlight_note(notes[1])
+        highlight.draw()
+        notes[1].draw()
         win.flip()
-        core.wait(STIMULUS_DURATION + 0.4)  # sound duration + brief pause
+        core.wait(STIMULUS_DURATION + 0.4)
 
-        # Sound 3
         main_sounds[all_sounds[trial[2]]].stop()
         main_sounds[all_sounds[trial[2]]].play()
-        three_rect.draw(); three_text.draw()
+        highlight = highlight_note(notes[2])
+        highlight.draw()
+        notes[2].draw()
         win.flip()
-        core.wait(STIMULUS_DURATION + 0.4)  # sound duration + brief pause
-        
+        core.wait(STIMULUS_DURATION + 0.4)
+    
+        # Loop logic
         clicked = False
+        was_down = False
+        canreplay1 = True
+        canreplay2 = True
+        canreplay3 = True
+
         while not clicked:
             if "escape" in event.getKeys(keyList=["escape"]):
                 win.close(); core.quit()
             if "s" in event.getKeys(keyList=["s"]):
                 return "skip"
-            
-            one_rect.draw(); one_text.draw()
-            two_rect.draw(); two_text.draw()
-            three_rect.draw(); three_text.draw()
-
-            rone_rect.draw(); rone_text.draw()
-            rtwo_rect.draw(); rtwo_text.draw()
+        
+            # Draw replay buttons
+            rone_rect.draw();  rone_text.draw()
+            rtwo_rect.draw();  rtwo_text.draw()
             rthree_rect.draw(); rthree_text.draw()
             win.flip()
 
             # Handle mouse clicks
-            if mouse.getPressed()[0]:
-                mpos = mouse.getPos()
-                if (abs(mpos[0] - one_rect.pos[0]) <= one_rect.width / 2) and (abs(mpos[1] - one_rect.pos[1]) <= one_rect.height / 2):
+            is_down = mouse.getPressed()[0] == 1
+
+            # Replay button logic
+            if canreplay1:
+                rone_rect.fillColor = "#4C7BF1"
+            else:
+                rone_rect.fillColor = "#565656"
+            if canreplay2:
+                rtwo_rect.fillColor = "#4C7BF1"
+            else:
+                rtwo_rect.fillColor = "#565656"
+            if canreplay3:
+                rthree_rect.fillColor = "#4C7BF1"
+            else:
+                rthree_rect.fillColor = "#565656"
+            
+            if is_down and not was_down:
+                # Notes
+                if notes[0].contains(mouse):
                     result = [trial[0], trial[1], trial[2]]
                     clicked = True
-                elif (abs(mpos[0] - two_rect.pos[0]) <= two_rect.width / 2) and (abs(mpos[1] - two_rect.pos[1]) <= two_rect.height / 2):
+                elif notes[1].contains(mouse):
                     result = [trial[1], trial[0], trial[2]]
                     clicked = True
-                elif (abs(mpos[0] - three_rect.pos[0]) <= three_rect.width / 2) and (abs(mpos[1] - three_rect.pos[1]) <= three_rect.height / 2):
+                elif notes[2].contains(mouse):
                     result = [trial[2], trial[0], trial[1]]
                     clicked = True
-                elif (abs(mpos[0] - rone_rect.pos[0]) <= rone_rect.width / 2) and (abs(mpos[1] - rone_rect.pos[1]) <= rone_rect.height / 2):
-                    main_sounds[all_sounds[trial[0]]].stop()
-                    main_sounds[all_sounds[trial[0]]].play()
-                    core.wait(STIMULUS_DURATION)
-                elif (abs(mpos[0] - rtwo_rect.pos[0]) <= rtwo_rect.width / 2) and (abs(mpos[1] - rtwo_rect.pos[1]) <= rtwo_rect.height / 2):
-                    main_sounds[all_sounds[trial[1]]].stop()
-                    main_sounds[all_sounds[trial[1]]].play()
-                    core.wait(STIMULUS_DURATION)
-                elif (abs(mpos[0] - rthree_rect.pos[0]) <= rthree_rect.width / 2) and (abs(mpos[1] - rthree_rect.pos[1]) <= rthree_rect.height / 2):
-                    main_sounds[all_sounds[trial[2]]].stop()
-                    main_sounds[all_sounds[trial[2]]].play()
-                    core.wait(STIMULUS_DURATION)
+                
+                # Replay buttons
+                elif (abs(mouse.getPos()[0] - rone_rect.pos[0]) <= rone_rect.width / 2) and (abs(mouse.getPos()[1] - rone_rect.pos[1]) <= rone_rect.height / 2):
+                    if canreplay1:
+                        main_sounds[all_sounds[trial[0]]].stop()
+                        main_sounds[all_sounds[trial[0]]].play()
+                        hightlight = highlight_note(notes[0])
+                        hightlight.draw()
+                        win.flip()
+                        core.wait(STIMULUS_DURATION)
+                        canreplay1 = False
+                elif (abs(mouse.getPos()[0] - rtwo_rect.pos[0]) <= rtwo_rect.width / 2) and (abs(mouse.getPos()[1] - rtwo_rect.pos[1]) <= rtwo_rect.height / 2):
+                    if canreplay2:
+                        main_sounds[all_sounds[trial[1]]].stop()
+                        main_sounds[all_sounds[trial[1]]].play()
+                        hightlight = highlight_note(notes[1])
+                        hightlight.draw()
+                        win.flip()
+                        core.wait(STIMULUS_DURATION)
+                        canreplay2 = False
+                elif (abs(mouse.getPos()[0] - rthree_rect.pos[0]) <= rthree_rect.width / 2) and (abs(mouse.getPos()[1] - rthree_rect.pos[1]) <= rthree_rect.height / 2):
+                    if canreplay3:
+                        main_sounds[all_sounds[trial[2]]].stop()
+                        main_sounds[all_sounds[trial[2]]].play()
+                        hightlight = highlight_note(notes[2])
+                        hightlight.draw()
+                        win.flip()
+                        core.wait(STIMULUS_DURATION)
+                        canreplay3 = False
+
                 if clicked:
                     diff_cts[result[0], result[1]] += 1
                     diff_cts[result[1], result[0]] += 1
@@ -849,11 +1031,14 @@ def triplets_block_sounds():
                     diff_cts[result[1], result[2]] -= 1
                     diff_cts[result[2], result[1]] -= 1  
                     core.wait(0.2)
+            was_down = is_down
         win.flip()
         core.wait(0.5)
-
-    print("Diff counts matrix (sounds):")
-    print(diff_cts)
+        
+    for n in notes:
+        n.autoDraw = False
+    instructions.autoDraw = False
+    progress_bar.autoDraw = False
     
     end_msg = visual.TextStim(
         win,
@@ -866,28 +1051,41 @@ def triplets_block_sounds():
     event.waitKeys(keyList=["space"])
 
     print("Triplets (sounds) block completed successfully.")
-    return "done"
+    return diff_cts
 
+# === Helper function for making trials in the unisensory block === 
 def pick_triplet_trial(uses):
     min_use = min(uses)
     candidates = [i for i, u in enumerate(uses) if u == min_use]
     if len(candidates) >= 3:
         random.shuffle(candidates)
-        for idx in candidates[:3]:
-            uses[idx] += 1
-        return tuple(candidates[:3]), uses
+        selection = candidates[:3]
     else:
-        chosen = list(candidates)
-        others = [(uses[i], i) for i in range(len(uses)) if i not in candidates]
+        selection = list(candidates)
+
+        others = [(uses[i], i) for i in range(10) if i not in candidates]
         random.shuffle(others)
         others.sort(key=lambda x: x[0])
-        for _, idx in others:
-            chosen.append(idx)
-            if len(chosen) == 3:
-                break
-            for idx in chosen:
-                uses[idx] += 1
-        return tuple(chosen), uses
+        length_needed = 3 - len(selection)
+        selection.extend([idx for _, idx in others[:length_needed]])
+
+    for i in selection:
+        uses[i] += 1
+    random.shuffle(selection)
+    return tuple(selection), uses
+
+# === Helper function to highlight a note stimulus ===
+def highlight_note(note_stim, on=True, color='red', scale=1.15):
+    w, h = note_stim.size
+    return visual.Rect(
+        win,
+        width=w * scale,
+        height=h * scale,
+        lineColor=color if on else None,
+        lineWidth=6 if on else 0,
+        fillColor=None,
+        pos=note_stim.pos,
+    )
 
 # === Always collect participant ID and set up paths before anything else ===
 participant_id = get_participant_id()
@@ -918,9 +1116,6 @@ main_sounds = preload_sounds(audio_dir)
 
 # === Experiment flow ===
 
-# Triplets block testing
-triplets_block_shapes()
-
 # Free Pairing — Block 1 (welcome text)
 intro_text_block1 = (
     "Welcome to the experiment!\n\n"
@@ -933,6 +1128,9 @@ result = free_pairings_block(intro_text_block1)
 if result == "skip":
     print("Free pairings block 1 skipped.")
 save_free_pairings_to_excel("free_pairings_block1.xlsx")
+
+# Unisensory Block
+unisensory_triplets_block()
 
 # Crossmodal with Feedback (keys: 1 = FIRST, 0 = SECOND; use left/right index fingers)
 result = crossmodal_with_feedback()
@@ -953,7 +1151,7 @@ if result == "skip":
 save_free_pairings_to_excel("free_pairings_block2.xlsx")
 
 # End Survey
-run_end_survey()
+run_end_survey_adv()
 
 # Save again (redundant but safe)
 save_crossmodal_with_feedback_to_excel()

@@ -480,9 +480,6 @@ main_sounds = preload_sounds(audio_dir)
 
 # === Experiment flow ===
 
-# Triplets block testing
-triplets_block_sounds()
-
 # Free Pairing — Block 1 (welcome text)
 intro_text_block1 = (
     "Welcome to the experiment!\n\n"
