@@ -379,6 +379,13 @@ def free_pairings_block(intro_text):
     mouse = event.Mouse(visible=True)
     selected_tone = None
 
+    shape_by_file = {s["file"]: s for s in shapes} # dictionaries for convenience
+    tone_by_file  = {t["file"]: t for t in tones}
+    shape_to_tone = {}  # pairing state
+    tone_to_shape = {}
+    tone_index_by_file = {t["file"]: i for i, t in enumerate(tones)}  # index into tone_positions
+
+
     # Intro instructions
     instr_result = show_instructions(intro_text, ["space"])
     if instr_result == "s":
@@ -412,14 +419,39 @@ def free_pairings_block(intro_text):
                 tone_sounds[tone_clicked["file"]].play()
                 selected_tone = tone_clicked
             elif selected_tone is not None:
-                for shape in shapes:
-                    if shape["stim"].contains(mouse):
-                        new_pos = (shape["stim"].pos[0], shape["stim"].pos[1] - 0.3)
-                        selected_tone["stim"].pos = new_pos
-                        selected_tone["paired_shape"] = shape["file"]
-                        selected_tone["new_pos"] = new_pos
-                        selected_tone = None
-                        break
+                # Check if a shape was clicked
+                clicked_shape = next((s for s in shapes if s["stim"].contains(mouse)), None)
+                if clicked_shape is not None:
+                    shape_file = clicked_shape["file"]
+                    tone_file  = selected_tone["file"]
+
+                    # if shape already has a tone, send old tone back home
+                    if shape_file in shape_to_tone:
+                        old_tone_file = shape_to_tone[shape_file]
+                        old_tone = tone_by_file[old_tone_file]
+                        idx = tone_index_by_file[old_tone_file]
+                        old_tone["stim"].pos = (tone_positions[idx], -0.5)
+                        old_tone.pop("paired_shape", None)
+                        old_tone.pop("new_pos", None)
+                        tone_to_shape.pop(old_tone_file, None)
+
+                    # if selected tone was already paired with another shape, free that shape
+                    if tone_file in tone_to_shape:
+                        prev_shape_file = tone_to_shape[tone_file]
+                        shape_to_tone.pop(prev_shape_file, None)
+
+                    # move selected tone under shape
+                    new_pos = (clicked_shape["stim"].pos[0], clicked_shape["stim"].pos[1] - 0.3)
+                    selected_tone["stim"].pos = new_pos
+                    selected_tone["paired_shape"] = shape_file
+                    selected_tone["new_pos"] = new_pos
+
+                    # update mappings
+                    shape_to_tone[shape_file] = tone_file
+                    tone_to_shape[tone_file] = shape_file
+
+                    selected_tone = None
+
             while any(mouse.getPressed()):
                 core.wait(0.01)
 
@@ -638,7 +670,7 @@ def crossmodal_with_feedback():
 # === Triplets block == 
 # the main fucnction calls the two triplets blocks in an order based on participant ID
 def unisensory_triplets_block():
-    numtrials = 10 # must be a multiple of 10 
+    numtrials = 50 # must be a multiple of 10 
     participant_num = int(participant_id)
     if participant_num % 2 == 0:
         diffcounts_shapes = triplets_block_shapes(numtrials)
