@@ -71,25 +71,32 @@ def save_crossmodal_with_feedback_to_excel():
     df.to_excel(excel_filename, index=False)
     print(f"Crossmodal with feedback data saved to {excel_filename}")
 
-def save_unimodal_to_excel(matrix, filename, type):
+def save_unimodal_to_excel(matrix, trial_log, type, order):
     try:
         participant_folder = os.path.join("./participant_data", participant_data["participant_id"])
         os.makedirs(participant_folder, exist_ok=True)
-
+        # Construct full file path
+        filename = os.path.join(participant_folder, f"Unimodal_{type}s_({order}).xlsx")
+        
         # Convert matrix to DataFrame
         column_names = [f"{type}_0{i+1}" for i in range(9)]
         column_names.append(f"{type}_10")
         rows = [f"{type}_0{i+1}" for i in range(9)]
         rows.append(f"{type}_10")
+        matrix_data = pd.DataFrame(matrix, columns=column_names, index=rows)
 
-        df = pd.DataFrame(matrix, columns=column_names, index=rows)
+        # Convert trial log to DataFrame
+        rows = [[x + 1 for x in trial] + [res + 1] for trial, res in trial_log]
+        trial_log_df = pd.DataFrame(rows, columns=[f"{type} 1",f"{type} 2",f"{type} 3",f"Chosen {type}"])
+        trial_log_df.index = range(1, len(trial_log) + 1)
+        trial_log_df.index.name = "Trial Number"
 
-        # Construct full file path
-        excel_filename = os.path.join(participant_folder, filename)
+        with pd.ExcelWriter(filename) as writer:
+            trial_log_df.to_excel(writer, sheet_name="Trials", index=True)
+            matrix_data.to_excel(writer,sheet_name="Difference_Scores", index=True)
 
-        # Attempt to save
-        df.to_excel(excel_filename)
-        print(f"Matrix data successfully saved to {excel_filename}")
+        print(f"Data successfully saved to {filename}")
+
 
     except Exception as e:
         print(f"Could not save matrix to Excel ({e}). Printing data instead:\n")
@@ -643,6 +650,8 @@ def crossmodal_with_feedback():
                 if "escape" in keys:
                     win.close(); core.quit()
                 elif "s" in keys:
+                    progress_bar.autoDraw = False
+                    win.flip()
                     return "skip"
                 elif keys:
                     response = keys[0]
@@ -677,6 +686,7 @@ def crossmodal_with_feedback():
                 "reaction_time": reaction_time,
             })
 
+        progress_bar.autoDraw = False
         end_msg = visual.TextStim(
             win,
             text="You have completed this block.\n\nPress SPACEBAR to continue.",
@@ -697,18 +707,18 @@ def crossmodal_with_feedback():
 # === Triplets block == 
 # the main fucnction calls the two triplets blocks in an order based on participant ID
 def unisensory_triplets_block():
-    numtrials = 5 # must be a multiple of 10 
+    numtrials = 50 # must be a multiple of 10 
     participant_num = int(participant_id)
     if participant_num % 2 == 0:
-        diffcounts_shapes = triplets_block_shapes(numtrials)
-        save_unimodal_to_excel(diffcounts_shapes,"unimodal_shapes.xlsx","shape")
-        diffcounts_sounds = triplets_block_sounds(numtrials)
-        save_unimodal_to_excel(diffcounts_sounds,"unimodal_sounds.xlsx","sound")
+        diffcounts_shapes, trial_log1 = triplets_block_shapes(numtrials)
+        save_unimodal_to_excel(diffcounts_shapes,trial_log1,"shape","first")
+        diffcounts_sounds, trial_log2 = triplets_block_sounds(numtrials)
+        save_unimodal_to_excel(diffcounts_sounds,trial_log2,"sound","second")
     else:
-        diffcounts_sounds = triplets_block_sounds(numtrials)
-        save_unimodal_to_excel(diffcounts_sounds,"unimodal_sounds.xlsx","sound")
-        diffcounts_shapes = triplets_block_shapes(numtrials)
-        save_unimodal_to_excel(diffcounts_shapes,"unimodal_shapes.xlsx","shape")
+        diffcounts_sounds, trial_log1 = triplets_block_sounds(numtrials)
+        save_unimodal_to_excel(diffcounts_sounds,trial_log1,"sound","first")
+        diffcounts_shapes, trial_log2 = triplets_block_shapes(numtrials)
+        save_unimodal_to_excel(diffcounts_shapes,trial_log2,"shape","second")
 
 def triplets_block_shapes(numtrials):
     # Setup
@@ -777,6 +787,7 @@ def triplets_block_shapes(numtrials):
             img_stim_left.autoDraw = False
             img_stim_center.autoDraw = False
             img_stim_right.autoDraw = False
+            win.flip()
             return "skip" 
         
         instructions.draw()
@@ -817,6 +828,7 @@ def triplets_block_shapes(numtrials):
                 img_stim_left.autoDraw = False
                 img_stim_center.autoDraw = False
                 img_stim_right.autoDraw = False
+                win.flip()
                 return "skip"
 
             buttons = mouse.getPressed()
@@ -867,9 +879,7 @@ def triplets_block_shapes(numtrials):
     win.flip()
     event.waitKeys(keyList=["space"])
 
-    print("Triplets block completed successfully.")
-    print("Trial log: ", trial_log)
-    return diff_cts
+    return diff_cts, trial_log
 
 def triplets_block_sounds(numtrials):
     # Setup
@@ -1033,6 +1043,7 @@ def triplets_block_sounds(numtrials):
                     n.autoDraw = False
                 instructions.autoDraw = False
                 progress_bar.autoDraw = False
+                win.flip()
                 return "skip"
         
             # Draw replay buttons
@@ -1128,9 +1139,7 @@ def triplets_block_sounds(numtrials):
     win.flip()
     event.waitKeys(keyList=["space"])
 
-    print("Triplets (sounds) block completed successfully.")
-    print("Trial log: ", trial_log)
-    return diff_cts
+    return diff_cts, trial_log
 
 # === Helper function for making trials in the unisensory block === 
 def pick_triplet_trial(uses):
