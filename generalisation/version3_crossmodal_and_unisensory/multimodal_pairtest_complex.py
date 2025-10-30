@@ -96,11 +96,10 @@ def save_unimodal_to_excel(matrix, trial_log, type, order):
             matrix_data.to_excel(writer,sheet_name="Difference_Scores", index=True)
 
         print(f"Data successfully saved to {filename}")
-
-
     except Exception as e:
         print(f"Could not save matrix to Excel ({e}). Printing data instead:\n")
-        print(np.array(matrix))
+        print(matrix)
+        print(trial_log)
 
 # === End-of-experiment survey ===
 def run_end_survey():
@@ -392,7 +391,7 @@ def free_pairings_block(intro_text):
     selected_tone = None
     mouse_was_pressed = False
 
-    shape_pairings = {}  # pairing states (index is shape file, value is tone file)
+    shape_pairings = {}  # pairing states
     tone_by_file  = {t["file"]: t for t in tones} # dictionaries for convenience
     tone_index_by_file = {t["file"]: i for i, t in enumerate(tones)}  # index into tone_positions
     highlight_rect = None
@@ -427,7 +426,8 @@ def free_pairings_block(intro_text):
             tone_clicked = next((t for t in tones if t["stim"].contains(mouse)), None)
 
             if tone_clicked is not None:
-                tone_sounds[tone_clicked["file"]].stop() # Play the sound
+                for t in tones:
+                    tone_sounds[t["file"]].stop()
                 tone_sounds[tone_clicked["file"]].play()
                 
                 if highlight_rect is not None: # Remove the previous highlight, if there is one
@@ -461,6 +461,10 @@ def free_pairings_block(intro_text):
                     selected_tone["new_pos"] = new_pos
 
                     # update mappings
+                    for shape, tone in shape_pairings.items():
+                        if tone == selected_tone["file"]:
+                            del shape_pairings[shape]
+                            break
                     shape_pairings[shape_file] = tone_file
                     selected_tone = None
 
@@ -708,17 +712,40 @@ def crossmodal_with_feedback():
 # the main fucnction calls the two triplets blocks in an order based on participant ID
 def unisensory_triplets_block():
     numtrials = 50 # must be a multiple of 10 
-    participant_num = int(participant_id)
+    try:
+        participant_num = int(participant_id[-1]) # Sort participants in half by ID
+    except ValueError:
+        print("Participant ID not valid, randomizing block order")
+        participant_num = random.randint(0,9)
+
     if participant_num % 2 == 0:
-        diffcounts_shapes, trial_log1 = triplets_block_shapes(numtrials)
-        save_unimodal_to_excel(diffcounts_shapes,trial_log1,"shape","first")
-        diffcounts_sounds, trial_log2 = triplets_block_sounds(numtrials)
-        save_unimodal_to_excel(diffcounts_sounds,trial_log2,"sound","second")
+        result = triplets_block_shapes(numtrials)
+        if result == "skip":
+            print("Triplets block shapes skipped")
+        else:
+            diffcounts_shapes, trial_log1 = result
+            save_unimodal_to_excel(diffcounts_shapes,trial_log1,"shape","first")
+        
+        result = triplets_block_sounds(numtrials)
+        if result == "skip":
+            print("Triplets block sounds skipped")
+        else:
+            diffcounts_sounds, trial_log2 = result
+            save_unimodal_to_excel(diffcounts_sounds,trial_log2,"sound","second")
     else:
-        diffcounts_sounds, trial_log1 = triplets_block_sounds(numtrials)
-        save_unimodal_to_excel(diffcounts_sounds,trial_log1,"sound","first")
-        diffcounts_shapes, trial_log2 = triplets_block_shapes(numtrials)
-        save_unimodal_to_excel(diffcounts_shapes,trial_log2,"shape","second")
+        result = triplets_block_sounds(numtrials)
+        if result == "skip":
+            print("Triplets block sounds skipped")
+        else:
+            diffcounts_sounds, trial_log2 = result
+            save_unimodal_to_excel(diffcounts_sounds,trial_log2,"sound","first")
+
+        result = triplets_block_shapes(numtrials)
+        if result == "skip":
+            print("Triplets block shapes skipped")
+        else:
+            diffcounts_shapes, trial_log1 = result
+            save_unimodal_to_excel(diffcounts_shapes,trial_log1,"shape","second")
 
 def triplets_block_shapes(numtrials):
     # Setup
