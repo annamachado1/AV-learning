@@ -78,11 +78,10 @@ def save_unimodal_to_excel(matrix, trial_log, type, order):
         # Construct full file path
         filename = os.path.join(participant_folder, f"Unimodal_{type}s_({order}).xlsx")
         
+        mx_size = len(matrix)
         # Convert matrix to DataFrame
-        column_names = [f"{type}_0{i+1}" for i in range(9)]
-        column_names.append(f"{type}_10")
-        rows = [f"{type}_0{i+1}" for i in range(9)]
-        rows.append(f"{type}_10")
+        column_names = [f"{type}_{i:02d}" for i in range(1, mx_size + 1)]
+        rows = [f"{type}_{i:02d}" for i in range(1, mx_size + 1)]
         matrix_data = pd.DataFrame(matrix, columns=column_names, index=rows)
 
         # Convert trial log to DataFrame
@@ -342,7 +341,7 @@ def preload_sounds(audio_dir):
     return sound_dict
 
 # === Free-pairing block (parameterized) ===
-def free_pairings_block(intro_text):
+def free_pairings_block(intro_text, version):
     """
     Shows shapes on the top row and musical notes on the bottom row.
     Participant clicks a note to play it, then clicks a shape to pair them.
@@ -353,34 +352,52 @@ def free_pairings_block(intro_text):
 
     # Use shape_01.png–shape_10.png and sound_01.wav–sound_10.wav
     shape_files = [f"shape_{i:02d}.png" for i in range(1, 11)]
+    extra_shape_files = []
+    if version == "Second":
+        extra_shape_files = [f"extrashape_{i:02d}.png" for i in range(1,5)]
+    total_shape_files = shape_files + extra_shape_files
+
     tone_files = [f"sound_{i:02d}.wav" for i in range(1, 11)]
 
     # Randomize the order of shapes and tones for display only
-    random.shuffle(shape_files)
+    random.shuffle(total_shape_files)
     random.shuffle(tone_files)
 
     # Evenly space shapes and tones
-    num_pairs = len(shape_files)
-    shape_positions = np.linspace(-0.9, 0.9, num_pairs)
-    tone_positions = np.linspace(-0.9, 0.9, num_pairs)
+    shapesrow1 = np.linspace(-0.9, 0.9, 10)
+    shapesrow2 = np.linspace(-0.6, 0.6, len(total_shape_files) - 10)
+    tone_positions = np.linspace(-0.9, 0.9, len(tone_files))
 
     shapes = []
     tones = []
     tone_sounds = {}
     
-    RAISE_DY    = 0.07  # Distance to raise the tones by   
-    UNDER_SHAPE_DY = 0.30   # Distance under the shape to place the tone once paired
+    if version == "First":
+        RAISE_DY    = 0.07  # Distance to raise the tones by
+        UNDER_SHAPE_DY = 0.30   # Distance under the shape to place the tone once paired   
+    else:
+        RAISE_DY    = 0.04 
+        UNDER_SHAPE_DY = 0.22
+
     ANIM_ALPHA  = 0.35  # Speed value for movement animation
 
-    for i, filename in enumerate(shape_files):
+    for i, filename in enumerate(total_shape_files):
+        if len(total_shape_files) <= 10:
+            pos = shapesrow1[i], 0.4
+        else:
+            if i < 10:
+                pos = shapesrow1[i], 0.6
+            else:
+                pos = shapesrow2[i - 10], 0.1
+
         stim = visual.ImageStim(
             win,
-            image=os.path.join(image_dir, filename),
-            pos=(shape_positions[i], 0.5),
+            image=os.path.join(image_dir, filename),                    
+            pos= pos,
             size=(0.15, 0.25)
-        )
+            )
         shapes.append({"stim": stim, "file": filename})
-
+    
     for i, filename in enumerate(tone_files):
         home_pos = (tone_positions[i], -0.5)
         stim = visual.ImageStim(
@@ -397,7 +414,6 @@ def free_pairings_block(intro_text):
                       "pressed": False,           # Is the tone pressed
                       "times_clicked": 0
                       })
-        
         tone_sounds[filename] = main_sounds[filename]
 
     def paired_pos(tone):
@@ -407,7 +423,6 @@ def free_pairings_block(intro_text):
             return tone["home_pos"]
         sx, sy = shape_by_file[shp_file]["stim"].pos
         return (sx, sy - UNDER_SHAPE_DY)
-
 
     def update_target(tone):
         # Set position to animate towards
@@ -446,7 +461,6 @@ def free_pairings_block(intro_text):
     shape_pairings = {}  # pairing states
     tone_by_file = {t["file"]: t for t in tones}
     shape_by_file = {s["file"]: s for s in shapes}
-
 
     # Intro instructions
     instr_result = show_instructions(intro_text, ["space"])
@@ -498,7 +512,6 @@ def free_pairings_block(intro_text):
                     set_pressed(t, False)
 
                 set_pressed(tone_clicked, True) # press clicked tone
-
                 selected_tone = tone_clicked # Update the selected tone
 
             elif selected_tone is not None:
@@ -545,7 +558,7 @@ def free_pairings_block(intro_text):
     # Record pairings
     for tone in tones:
         if "paired_shape" in tone:
-            sound_index = int(tone["file"].split('_')[1].split('.')[0])
+            sound_index = int(tone["file"].split('_')[1].split('.')[0])            
             shape_index = int(next(s["file"] for s in shapes if s["file"] == tone["paired_shape"]).split('_')[1].split('.')[0])
             participant_data["free_pairings"].append({
                 "tone_file": tone["file"],
@@ -663,7 +676,6 @@ def crossmodal_with_feedback():
         )
         
         crossmodal_timer_main = core.Clock()
-        global durations
 
         for trial_index, (img_file, audio_file, tones) in enumerate(crossmodal_trials):
             event.clearEvents()
@@ -767,7 +779,7 @@ def crossmodal_with_feedback():
         win.flip()
         event.waitKeys(keyList=["space"])
 
-        durations["Crossmodal with Feedback"] = crossmodal_timer_main.getTime()
+        duration = crossmodal_timer_main.getTime()
 
         print("Crossmodal with feedback completed successfully.")
         return "done"
@@ -780,7 +792,7 @@ def crossmodal_with_feedback():
 # === Triplets block == 
 # the main fucnction calls the two triplets blocks in an order based on participant ID
 def unisensory_triplets_block():
-    numtrials = 50 # must be a multiple of 10 
+    numtrials = 10 # must be a multiple of 10 
     try:
         participant_num = int(participant_id[-1]) # Sort participants in half by ID
     except ValueError:
@@ -788,8 +800,6 @@ def unisensory_triplets_block():
         participant_num = random.randint(0,9)
 
     unimodal_timer = core.Clock()
-    global durations
-
     if participant_num % 2 == 0:
         result = triplets_block_shapes(numtrials)
         if result == "skip":
@@ -797,7 +807,7 @@ def unisensory_triplets_block():
         else:
             diffcounts_shapes, trial_log1 = result
             save_unimodal_to_excel(diffcounts_shapes,trial_log1,"shape","first")
-        durations["Unimodal Triplets Shapes"] = unimodal_timer.getTime()
+        duration = unimodal_timer.getTime()
         unimodal_timer.reset()
         
         result = triplets_block_sounds(numtrials)
@@ -806,7 +816,7 @@ def unisensory_triplets_block():
         else:
             diffcounts_sounds, trial_log2 = result
             save_unimodal_to_excel(diffcounts_sounds,trial_log2,"sound","second")
-        durations["Unimodal Triplets Sounds"] = unimodal_timer.getTime()
+        duration = unimodal_timer.getTime()
 
     else:
         result = triplets_block_sounds(numtrials)
@@ -815,7 +825,7 @@ def unisensory_triplets_block():
         else:
             diffcounts_sounds, trial_log2 = result
             save_unimodal_to_excel(diffcounts_sounds,trial_log2,"sound","first")
-        durations["Unimodal Triplets Sounds"] = unimodal_timer.getTime()
+        duration = unimodal_timer.getTime()
         unimodal_timer.reset()
 
         result = triplets_block_shapes(numtrials)
@@ -824,7 +834,7 @@ def unisensory_triplets_block():
         else:
             diffcounts_shapes, trial_log1 = result
             save_unimodal_to_excel(diffcounts_shapes,trial_log1,"shape","second")
-        durations["Unimodal Triplets Shapes"] = unimodal_timer.getTime()
+        duration = unimodal_timer.getTime()
 
 def triplets_block_shapes(numtrials):
     # Setup
@@ -833,12 +843,15 @@ def triplets_block_shapes(numtrials):
     img_stim_right = visual.ImageStim(win, image=None, size=(0.3, 0.4), pos=(0.5, 0))
     mouse = event.Mouse(win=win)
 
-    diff_cts =  np.zeros((10,10), dtype=int)
-    
-    all_shapes = [pair[0] for pair in stimuli_pairs]
+    shape_files = [f"shape_{i:02d}.png" for i in range(1, 11)]
+    extra_shape_files = [f"extrashape_{i:02d}.png" for i in range(1,5)]
+    all_shapes = shape_files + extra_shape_files
+    numshapes = len(all_shapes)
     image_path_list = []
     for img_file in all_shapes:
         image_path_list.append(os.path.join(image_dir, img_file))
+
+    diff_cts =  np.zeros((numshapes,numshapes), dtype=int)
 
     instructions = visual.TextStim(
         win,
@@ -852,7 +865,7 @@ def triplets_block_shapes(numtrials):
     
     # Make the trials
     trial_list = []
-    item_uses = np.zeros((10), dtype=int)
+    item_uses = np.zeros((numshapes), dtype=int)
     for _ in range(numtrials):
         trial, item_uses = pick_triplet_trial(item_uses)
         trial_list.append(trial)
@@ -1306,8 +1319,8 @@ except Exception as e:
 # === Preload audio ===
 main_sounds = preload_sounds(audio_dir)
 
-# === List of task durations === 
-durations = {}
+# === Extra Shape Locations === 
+extra_shape_locations = (0,5,9,11)
 
 # === Experiment flow ===
 
@@ -1319,7 +1332,7 @@ intro_text_block1 = (
     "then click the shape you think goes best with that sound.\n\n"
     "Press SPACEBAR to continue."
 )
-result = free_pairings_block(intro_text_block1)
+result = free_pairings_block(intro_text_block1, "First")
 if result == "skip":
     print("Free pairings block 1 skipped.")
 save_free_pairings_to_excel("free_pairings_block1.xlsx")
@@ -1340,7 +1353,7 @@ intro_text_block2 = (
     "then click the shape you think goes best with that sound.\n\n"
     "Press SPACEBAR to continue."
 )
-result = free_pairings_block(intro_text_block2)
+result = free_pairings_block(intro_text_block2, "Second")
 if result == "skip":
     print("Free pairings block 2 skipped.")
 save_free_pairings_to_excel("free_pairings_block2.xlsx")
@@ -1350,8 +1363,6 @@ run_end_survey_adv()
 
 # Save again (redundant but safe)
 save_crossmodal_with_feedback_to_excel()
-
-print(durations)
 
 # Cleanup
 win.close()
