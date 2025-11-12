@@ -53,7 +53,7 @@ def show_instructions(text, key_list):
         if keys:
             return keys[0]
 
-# === Save helpers (only the ones we actually use) ===
+# === Save helpers ===
 def save_free_pairings_to_excel(filename):
     """Save participant_data['free_pairings'] to ./participant_data/<ID>/<filename>"""
     participant_folder = os.path.join("./participant_data", participant_data["participant_id"])
@@ -71,34 +71,50 @@ def save_crossmodal_with_feedback_to_excel():
     df.to_excel(excel_filename, index=False)
     print(f"Crossmodal with feedback data saved to {excel_filename}")
 
-def save_unimodal_to_excel(matrix, trial_log, type, order):
+def save_unimodal_to_excel(matrix, trial_log, stimuli, duration, label, order):
     try:
+        # --- paths ---
         participant_folder = os.path.join("./participant_data", participant_data["participant_id"])
         os.makedirs(participant_folder, exist_ok=True)
-        # Construct full file path
-        filename = os.path.join(participant_folder, f"Unimodal_{type}s_({order}).xlsx")
-        
-        mx_size = len(matrix)
-        # Convert matrix to DataFrame
-        column_names = [f"{type}_{i:02d}" for i in range(1, mx_size + 1)]
-        rows = [f"{type}_{i:02d}" for i in range(1, mx_size + 1)]
-        matrix_data = pd.DataFrame(matrix, columns=column_names, index=rows)
+        filename = os.path.join(participant_folder, f"Unimodal_{label}s_({order}).xlsx")
 
-        # Convert trial log to DataFrame
-        rows = [[x + 1 for x in trial] + [res + 1] for trial, res in trial_log]
-        trial_log_df = pd.DataFrame(rows, columns=[f"{type} 1",f"{type} 2",f"{type} 3",f"Chosen {type}"])
-        trial_log_df.index = range(1, len(trial_log) + 1)
+        # --- matrix → DataFrame (square, labels from stimuli) ---
+        n = len(stimuli)
+        matrix_df = pd.DataFrame(matrix, index=stimuli, columns=stimuli)
+
+        # --- trial log mapping (indices → names OR pass-through if already names) ---
+        def name_of(x):
+            return stimuli[x] if isinstance(x, int) else x
+
+        trial_rows = [[name_of(t[0]), name_of(t[1]), name_of(t[2]), name_of(res)]
+                      for t, res in trial_log]
+
+        trial_cols = [f"{label} 1", f"{label} 2", f"{label} 3", f"Chosen {label}"]
+        trial_log_df = pd.DataFrame(trial_rows, columns=trial_cols)
+        trial_log_df.index = range(1, len(trial_rows) + 1)
         trial_log_df.index.name = "Trial Number"
 
-        with pd.ExcelWriter(filename) as writer:
-            trial_log_df.to_excel(writer, sheet_name="Trials", index=True)
-            matrix_data.to_excel(writer,sheet_name="Difference_Scores", index=True)
+        # --- meta info at top of Trials sheet ---
+        meta_df = pd.DataFrame({
+            "Duration (s)": [duration],
+            "Order": [order],
+            "N stimuli": [n],
+        })
+
+        with pd.ExcelWriter(filename, engine="openpyxl") as writer:
+            # Trials sheet: meta first, blank row, then table
+            meta_df.to_excel(writer, sheet_name="Trials", index=False, startrow=0)
+            trial_log_df.to_excel(writer, sheet_name="Trials", index=True, startrow=len(meta_df) + 2)
+
+            # Matrix sheet
+            matrix_df.to_excel(writer, sheet_name="Difference_Scores", index=True)
+
+            # Stimuli sheet (for traceability)
+            pd.DataFrame({"Stimulus": stimuli}).to_excel(writer, sheet_name="Stimuli", index=True)
 
         print(f"Data successfully saved to {filename}")
     except Exception as e:
-        print(f"Could not save matrix to Excel ({e}). Printing data instead:\n")
-        print(matrix)
-        print(trial_log)
+        print(f"Could not save matrix to Excel ({e}).")
 
 # === End-of-experiment survey ===
 def run_end_survey():
@@ -354,7 +370,7 @@ def free_pairings_block(intro_text, version):
     shape_files = [f"shape_{i:02d}.png" for i in range(1, 11)]
     extra_shape_files = []
     if version == "Second":
-        extra_shape_files = [f"extrashape_{i:02d}.png" for i in range(1,5)]
+        extra_shape_files = [f"extrashape_{i}.png" for i in extra_shape_indices]
     total_shape_files = shape_files + extra_shape_files
 
     tone_files = [f"sound_{i:02d}.wav" for i in range(1, 11)]
@@ -364,8 +380,18 @@ def free_pairings_block(intro_text, version):
     random.shuffle(tone_files)
 
     # Evenly space shapes and tones
-    shapesrow1 = np.linspace(-0.9, 0.9, 10)
-    shapesrow2 = np.linspace(-0.6, 0.6, len(total_shape_files) - 10)
+    numshapes = len(total_shape_files)
+    if version == "First":
+        shapesrow1 = np.linspace(-0.9, 0.9, min(numshapes, 10))
+        shapesrow2 = np.array([])  # no second row
+    else:
+        if numshapes % 2 == 0:
+            shapesrow1 = np.linspace(-0.7, 0.7, numshapes // 2)
+            shapesrow2 = np.linspace(-0.7, 0.7, numshapes // 2)
+        else:
+            shapesrow1 = np.linspace(-0.7, 0.7, (numshapes + 1) // 2)
+            shapesrow2 = np.linspace(-0.7, 0.7, numshapes // 2)
+    
     tone_positions = np.linspace(-0.9, 0.9, len(tone_files))
 
     shapes = []
@@ -385,10 +411,10 @@ def free_pairings_block(intro_text, version):
         if len(total_shape_files) <= 10:
             pos = shapesrow1[i], 0.4
         else:
-            if i < 10:
+            if i < len(shapesrow1):
                 pos = shapesrow1[i], 0.6
             else:
-                pos = shapesrow2[i - 10], 0.1
+                pos = shapesrow2[i - len(shapesrow1)], 0.1
 
         stim = visual.ImageStim(
             win,
@@ -397,7 +423,7 @@ def free_pairings_block(intro_text, version):
             size=(0.15, 0.25)
             )
         shapes.append({"stim": stim, "file": filename})
-    
+
     for i, filename in enumerate(tone_files):
         home_pos = (tone_positions[i], -0.5)
         stim = visual.ImageStim(
@@ -559,7 +585,8 @@ def free_pairings_block(intro_text, version):
     for tone in tones:
         if "paired_shape" in tone:
             sound_index = int(tone["file"].split('_')[1].split('.')[0])            
-            shape_index = int(next(s["file"] for s in shapes if s["file"] == tone["paired_shape"]).split('_')[1].split('.')[0])
+            shape_label = tone["paired_shape"].split('_')[1].split('.')[0]
+            shape_index = float(shape_label.replace('p', '.'))
             participant_data["free_pairings"].append({
                 "tone_file": tone["file"],
                 "shape_file": tone["paired_shape"],
@@ -779,8 +806,6 @@ def crossmodal_with_feedback():
         win.flip()
         event.waitKeys(keyList=["space"])
 
-        duration = crossmodal_timer_main.getTime()
-
         print("Crossmodal with feedback completed successfully.")
         return "done"
 
@@ -791,8 +816,8 @@ def crossmodal_with_feedback():
 
 # === Triplets block == 
 # the main fucnction calls the two triplets blocks in an order based on participant ID
-def unisensory_triplets_block():
-    numtrials = 10 # must be a multiple of 10 
+def unisensory_triplets_block(version):
+    uses_per_item = 3  # Must be a multiple of 3 due to triplet design
     try:
         participant_num = int(participant_id[-1]) # Sort participants in half by ID
     except ValueError:
@@ -801,51 +826,59 @@ def unisensory_triplets_block():
 
     unimodal_timer = core.Clock()
     if participant_num % 2 == 0:
-        result = triplets_block_shapes(numtrials)
+        result = triplets_block_shapes(uses_per_item)
         if result == "skip":
             print("Triplets block shapes skipped")
         else:
-            diffcounts_shapes, trial_log1 = result
-            save_unimodal_to_excel(diffcounts_shapes,trial_log1,"shape","first")
-        duration = unimodal_timer.getTime()
-        unimodal_timer.reset()
+            diffcounts_shapes, trial_log1, stimuli = result
+            duration = unimodal_timer.getTime()
+            save_unimodal_to_excel(diffcounts_shapes,trial_log1,stimuli, duration,"Shape", f"First_{version}")
         
-        result = triplets_block_sounds(numtrials)
-        if result == "skip":
-            print("Triplets block sounds skipped")
-        else:
-            diffcounts_sounds, trial_log2 = result
-            save_unimodal_to_excel(diffcounts_sounds,trial_log2,"sound","second")
-        duration = unimodal_timer.getTime()
-
-    else:
-        result = triplets_block_sounds(numtrials)
-        if result == "skip":
-            print("Triplets block sounds skipped")
-        else:
-            diffcounts_sounds, trial_log2 = result
-            save_unimodal_to_excel(diffcounts_sounds,trial_log2,"sound","first")
-        duration = unimodal_timer.getTime()
         unimodal_timer.reset()
+        result = triplets_block_sounds(uses_per_item)
+        if result == "skip":
+            print("Triplets block sounds skipped")
+        else:
+            diffcounts_sounds, trial_log2, stimuli = result
+            duration = unimodal_timer.getTime()
+            save_unimodal_to_excel(diffcounts_sounds,trial_log2,stimuli,duration,"Tone", f"Second_{version}")
+    else:
+        result = triplets_block_sounds(uses_per_item)
+        if result == "skip":
+            print("Triplets block sounds skipped")
+        else:
+            diffcounts_sounds, trial_log2, stimuli = result
+            duration = unimodal_timer.getTime()
+            save_unimodal_to_excel(diffcounts_sounds,trial_log2,stimuli, duration,"Tone",f"First_{version}")
 
-        result = triplets_block_shapes(numtrials)
+        unimodal_timer.reset()
+        result = triplets_block_shapes(uses_per_item)
         if result == "skip":
             print("Triplets block shapes skipped")
         else:
-            diffcounts_shapes, trial_log1 = result
-            save_unimodal_to_excel(diffcounts_shapes,trial_log1,"shape","second")
-        duration = unimodal_timer.getTime()
+            diffcounts_shapes, trial_log1, stimuli = result
+            duration = unimodal_timer.getTime()
+            save_unimodal_to_excel(diffcounts_shapes,trial_log1,stimuli,duration,"Shape",f"Second_{version}")
 
-def triplets_block_shapes(numtrials):
+def triplets_block_shapes(uses_per_item):
     # Setup
     img_stim_left = visual.ImageStim(win, image=None, size=(0.3, 0.4), pos=(-0.5, 0))
     img_stim_center = visual.ImageStim(win, image=None, size=(0.3, 0.4), pos=(0, 0))
     img_stim_right = visual.ImageStim(win, image=None, size=(0.3, 0.4), pos=(0.5, 0))
     mouse = event.Mouse(win=win)
 
+    # Import Shape files
     shape_files = [f"shape_{i:02d}.png" for i in range(1, 11)]
-    extra_shape_files = [f"extrashape_{i:02d}.png" for i in range(1,5)]
-    all_shapes = shape_files + extra_shape_files
+    extra_shape_files = [f"extrashape_{i}.png" for i in extra_shape_indices]
+
+    # Create full list and sort it by index value
+    all_shapes = shape_files + extra_shape_files 
+    def sort_key(filename):
+        label = filename.split('_')[1].split('.')[0]
+        return float(label.replace('p', '.')) 
+    all_shapes.sort(key=sort_key)
+      
+    
     numshapes = len(all_shapes)
     image_path_list = []
     for img_file in all_shapes:
@@ -855,7 +888,7 @@ def triplets_block_shapes(numtrials):
 
     instructions = visual.TextStim(
         win,
-        text="Pick The Shape That You Think Doesn't Belong",
+        text="Which One is the Odd One Out?",
         pos=(0, 0.55),
         height=0.08,
         color="lightgray",
@@ -863,9 +896,11 @@ def triplets_block_shapes(numtrials):
         alignText="center",
     )
     
+    numtrials = (uses_per_item * numshapes) // 3
+
     # Make the trials
     trial_list = []
-    item_uses = np.zeros((numshapes), dtype=int)
+    item_uses = np.zeros(numshapes, dtype=int)
     for _ in range(numtrials):
         trial, item_uses = pick_triplet_trial(item_uses)
         trial_list.append(trial)
@@ -997,13 +1032,14 @@ def triplets_block_shapes(numtrials):
     win.flip()
     event.waitKeys(keyList=["space"])
 
-    return diff_cts, trial_log
+    return diff_cts, trial_log, all_shapes
 
-def triplets_block_sounds(numtrials):
+def triplets_block_sounds(uses_per_item):
     # Setup
     all_sounds = [pair[1] for pair in stimuli_pairs]
     diff_cts = np.zeros((10,10), dtype=int) 
     
+    numtrials = (uses_per_item * 10) // 3
     # Make the trials
     uses = np.zeros((10), dtype=int)
     trial_list = []
@@ -1073,7 +1109,7 @@ def triplets_block_sounds(numtrials):
     # Define the instructions
     instructions = visual.TextStim(
         win,
-        text="Pick The Sound That You Think Doesn't Belong",
+        text="Which One is the Odd One Out?",
         pos=(0, 0.55),
         height=0.08,
         color="lightgray",
@@ -1256,7 +1292,7 @@ def triplets_block_sounds(numtrials):
     win.flip()
     event.waitKeys(keyList=["space"])
 
-    return diff_cts, trial_log
+    return diff_cts, trial_log, all_sounds
 
 # === Helper function for making trials in the unisensory block === 
 def pick_triplet_trial(uses):
@@ -1319,8 +1355,8 @@ except Exception as e:
 # === Preload audio ===
 main_sounds = preload_sounds(audio_dir)
 
-# === Extra Shape Locations === 
-extra_shape_locations = (0,5,9,11)
+# === Extra Shape indices === 
+extra_shape_indices = ("0","2p5","5p5","7p5","9p5","11")
 
 # === Experiment flow ===
 
@@ -1338,13 +1374,16 @@ if result == "skip":
 save_free_pairings_to_excel("free_pairings_block1.xlsx")
 
 # Unisensory Block
-unisensory_triplets_block()
+unisensory_triplets_block("Pre-Crossmodal")
 
 # Crossmodal with Feedback (keys: 1 = FIRST, 0 = SECOND; use left/right index fingers)
 result = crossmodal_with_feedback()
 if result == "skip":
     print("Crossmodal with feedback skipped.")
 save_crossmodal_with_feedback_to_excel()
+
+# Unisensory Block
+unisensory_triplets_block("Post-Crossmodal")
 
 # Free Pairing — Block 2 (non-redundant intro text)
 intro_text_block2 = (

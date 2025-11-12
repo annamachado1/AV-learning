@@ -33,13 +33,14 @@ def compute_rms_contrast(png_path):
 # ────────── main generator ─────────────────────────────────────────────────
 def generate_shapes(
         output_dir     = "generated_shapes",
-        sides_list     = (6, 18, 28, 32), 
-        jagged_list    = (0.08, 0.50, 0.85, 0.99),
+        sides_list     = (6, 11, 18, 23, 28, 32), 
+        jagged_list    = (0.08,0.25, 0.50, 0.67, 0.85, 0.99),
+        shape_indices = ("0","2p5","5p5","7p5","9p5","11"),
         scale          = 0.75,
         distortion     = 0.40,           # constant
         concavity      = 0.30,           # constant
         target_rms     = 120,
-        random_seed    = 42 ):           # default fixed seed
+        random_seed    = 4 ):           # default fixed seed
 
     if random_seed is not None:
         np.random.seed(random_seed)
@@ -49,7 +50,7 @@ def generate_shapes(
     os.makedirs(output_dir, exist_ok=True)
     meta = []
 
-    for  idx, (n_sides, jag) in enumerate(zip(sides_list, jagged_list),1):
+    for  idx, (n_sides, jag) in enumerate(zip(sides_list, jagged_list)):
         # --- draw polygon ---------------------------------------------------
         fig, ax = plt.subplots(figsize=(5, 5), dpi=300)
         pts     = generate_complex_polygon(n_sides, distortion, concavity,
@@ -57,7 +58,7 @@ def generate_shapes(
         ax.add_patch(plt.Polygon(pts, color='black'))
         ax.set(xlim=(0,1), ylim=(0,1), aspect='equal'); ax.axis('off')
 
-        fname = os.path.join(output_dir, f"extrashape_{idx:02d}.png")
+        fname = os.path.join(output_dir, f"extrashape_{shape_indices[idx]}.png")
         plt.savefig(fname, bbox_inches='tight', pad_inches=0.2); plt.close(fig)
 
         # --- RMS‐contrast balancing (identical to before) -------------------
