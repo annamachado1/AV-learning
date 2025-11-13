@@ -63,12 +63,30 @@ def save_free_pairings_to_excel(filename):
     df.to_excel(excel_filename, index=False)
     print(f"Free pairings data saved to {excel_filename}")
 
-def save_crossmodal_with_feedback_to_excel():
+def save_crossmodal_with_feedback_to_excel(duration):
     participant_folder = os.path.join("./participant_data", participant_data["participant_id"])
     os.makedirs(participant_folder, exist_ok=True)
-    df = pd.DataFrame(participant_data.get("crossmodal_wf_log", []))
     excel_filename = os.path.join(participant_folder, "crossmodal_wf_log.xlsx")
-    df.to_excel(excel_filename, index=False)
+
+    wf_log = participant_data.get("crossmodal_wf_log", [])
+    wf_df = pd.DataFrame(wf_log)
+
+    meta_df = pd.DataFrame({
+        "Duration": [duration],          # can be "Partial" or seconds
+        "Participant ID": [participant_data.get("participant_id", "")],
+    })
+
+    with pd.ExcelWriter(excel_filename, engine="openpyxl") as writer:
+        # Meta first, blank row, then the trial table
+        sheet_name = "Crossmodal_with_feedback"
+        meta_df.to_excel(writer, sheet_name=sheet_name, index=False, startrow=0)
+        wf_df.to_excel(
+            writer,
+            sheet_name=sheet_name,
+            index=False,
+            startrow=len(meta_df) + 2  # one blank row between meta and table
+        )
+
     print(f"Crossmodal with feedback data saved to {excel_filename}")
 
 def save_unimodal_to_excel(matrix, trial_log, stimuli, duration, label, order):
@@ -86,10 +104,14 @@ def save_unimodal_to_excel(matrix, trial_log, stimuli, duration, label, order):
         def name_of(x):
             return stimuli[x] if isinstance(x, int) else x
 
-        trial_rows = [[name_of(t[0]), name_of(t[1]), name_of(t[2]), name_of(res)]
-                      for t, res in trial_log]
+        if label == "Shape":
+            trial_rows = [[name_of(t[0]), name_of(t[1]), name_of(t[2]), name_of(res), rxntime] for t, res, rxntime in trial_log]
+            trial_cols = [f"{label} 1", f"{label} 2", f"{label} 3", f"Chosen {label}", "Response Time (s)"]
+        else:  # The sounds block also has replay counts in the trial log
+            trial_rows = [[name_of(t[0]), name_of(t[1]), name_of(t[2]), name_of(res), rxntime, replays] for t, res, rxntime, replays in trial_log]
+            trial_cols = [f"{label} 1", f"{label} 2", f"{label} 3", f"Chosen {label}", "Response Time (s)", "Replay Count"]
 
-        trial_cols = [f"{label} 1", f"{label} 2", f"{label} 3", f"Chosen {label}"]
+
         trial_log_df = pd.DataFrame(trial_rows, columns=trial_cols)
         trial_log_df.index = range(1, len(trial_rows) + 1)
         trial_log_df.index.name = "Trial Number"
@@ -307,7 +329,6 @@ def run_end_survey_adv():
 
         # Handle keys
         keys = event.getKeys(modifiers=True, timeStamped=False)
-        
         for k in keys:
             if isinstance(k, tuple):
                 key, mods = k
@@ -316,9 +337,17 @@ def run_end_survey_adv():
 
             # Quit
             if key == "escape":
-                if key == "escape":
-                    textbox.editable = False
-                    core.quit()
+                textbox.editable = False
+                core.quit()
+            # Return
+            if key == "return":
+                responses[idx] = textbox.text
+                if idx < nQ - 1:
+                    idx += 1
+                    load_q(idx)
+                else:
+                    break
+    
     # Finished
     textbox.editable = False
     try:
@@ -677,6 +706,64 @@ def crossmodal_with_feedback():
 
         random.shuffle(crossmodal_trials)
 
+        def add_catch_trials(trial_list, num_catch_trials, buffer):
+            # each tone can be used up to 3 times as an incorrect option
+            tone_quota = {tone: 3 for tone in all_tones}
+
+            catch_trials = []
+
+            for i in range(num_catch_trials):
+                shapefile, correct_sound = local_stimuli[i % 10]
+                chosen_wrong = []
+                for _ in range(2):
+                    attempts = 0
+                    picked = None
+                    while attempts < 30:
+                        attempts += 1
+                        candidates = [
+                            t for t in all_tones
+                            if t != correct_sound
+                            and tone_quota[t] > 0
+                            and t not in chosen_wrong
+                        ]
+                        if not candidates:
+                            break  # no valid candidates under quota -> bail out of this while
+
+                        picked = random.choice(candidates)
+                        tone_quota[picked] -= 1
+                        break
+
+                    if picked is None:
+                        # Fallback: ignore quotas, just avoid correct tone and duplicates
+                        candidates = [
+                            t for t in all_tones
+                            if t != correct_sound
+                            and t not in chosen_wrong
+                        ]
+                        picked = random.choice(candidates)
+
+                    chosen_wrong.append(picked)
+
+                catch_trials.append((shapefile, -1, chosen_wrong))
+
+            total_trials = len(trial_list)
+            usable_span = total_trials - buffer
+            spacing = usable_span / (num_catch_trials + 1)
+            insert_positions = [
+                buffer + int(i * spacing)
+                for i in range(num_catch_trials)
+            ]
+
+            random.shuffle(catch_trials)
+
+            for i, catch in enumerate(catch_trials):
+                trial_list.insert(insert_positions[i] + i, catch)
+
+            return trial_list
+        
+        # add catch trials, number of trials = 10 percent of total (since num pairs = 10, its just the num of trials per pair)
+        crossmodal_trials = add_catch_trials(crossmodal_trials, num_catch_trials = TRIALS_PER_PAIR, buffer = 20) 
+
         correct_feedback = visual.ImageStim(win, image="green_tick.png", size=(0.2, 0.2), pos=(0, 0))
         incorrect_feedback = visual.ImageStim(win, image="red_cross.png", size=(0.2, 0.2), pos=(0, 0))
 
@@ -772,7 +859,14 @@ def crossmodal_with_feedback():
             reaction_time = round(trial_clock.getTime(), 3)
 
             correct_sound = dict(stimuli_pairs).get(img_file)
-            correct_answer = "1" if tones[0] == correct_sound else "0"
+            
+            if tones[0] == correct_sound:
+                correct_answer = "1"
+            elif tones[1] == correct_sound:
+                correct_answer = "0"
+            else:
+                correct_answer = "-1"  # catch trial
+
 
             participant_data["reaction time"].append(reaction_time)
             if response == correct_answer:
@@ -807,7 +901,7 @@ def crossmodal_with_feedback():
         event.waitKeys(keyList=["space"])
 
         print("Crossmodal with feedback completed successfully.")
-        return "done"
+        return crossmodal_timer_main.getTime()
 
     except Exception as e:
         print("Error during crossmodal with feedback:")
@@ -817,7 +911,7 @@ def crossmodal_with_feedback():
 # === Triplets block == 
 # the main fucnction calls the two triplets blocks in an order based on participant ID
 def unisensory_triplets_block(version):
-    uses_per_item = 3  # Must be a multiple of 3 due to triplet design
+    uses_per_item = 9  # Must be a multiple of 3 due to triplet design
     try:
         participant_num = int(participant_id[-1]) # Sort participants in half by ID
     except ValueError:
@@ -1008,7 +1102,7 @@ def triplets_block_shapes(uses_per_item):
 
                     diff_cts[result[1], result[2]]-= 1
                     diff_cts[result[2], result[1]] -= 1
-                    trial_log.append([trial,result[0]])   
+                    trial_log.append([trial,result[0],trial_clock.getTime()])   
                     break  # move to next trial
 
             prev_buttons = buttons
@@ -1129,11 +1223,14 @@ def triplets_block_sounds(uses_per_item):
     )
 
     mouse = event.Mouse(win=win)
+    trial_clock = core.Clock()
 
     # Trial loop
     for idx, trial in enumerate(trial_list):
         event.clearEvents()
         mouse.clickReset()
+        trial_clock.reset()
+
         if "escape" in event.getKeys(keyList=["escape"]):
             win.close(); core.quit()
         if "s" in event.getKeys(keyList=["s"]):
@@ -1187,6 +1284,7 @@ def triplets_block_sounds(uses_per_item):
         canreplay1 = True
         canreplay2 = True
         canreplay3 = True
+        replays = [0,0,0]
 
         while not clicked:
             if "escape" in event.getKeys(keyList=["escape"]):
@@ -1204,7 +1302,7 @@ def triplets_block_sounds(uses_per_item):
             rtwo_rect.draw();  rtwo_text.draw()
             rthree_rect.draw(); rthree_text.draw()
             win.flip()
-
+            
             # Handle mouse clicks
             is_down = mouse.getPressed()[0] == 1
 
@@ -1240,6 +1338,7 @@ def triplets_block_sounds(uses_per_item):
                         main_sounds[all_sounds[trial[0]]].stop()
                         main_sounds[all_sounds[trial[0]]].play()
                         hightlight = highlight_note(notes[0])
+                        replays[0] += 1
                         hightlight.draw()
                         win.flip()
                         core.wait(STIMULUS_DURATION)
@@ -1248,6 +1347,7 @@ def triplets_block_sounds(uses_per_item):
                     if canreplay2:
                         main_sounds[all_sounds[trial[1]]].stop()
                         main_sounds[all_sounds[trial[1]]].play()
+                        replays[1] += 1
                         hightlight = highlight_note(notes[1])
                         hightlight.draw()
                         win.flip()
@@ -1257,6 +1357,7 @@ def triplets_block_sounds(uses_per_item):
                     if canreplay3:
                         main_sounds[all_sounds[trial[2]]].stop()
                         main_sounds[all_sounds[trial[2]]].play()
+                        replays[2] += 1
                         hightlight = highlight_note(notes[2])
                         hightlight.draw()
                         win.flip()
@@ -1271,7 +1372,7 @@ def triplets_block_sounds(uses_per_item):
 
                     diff_cts[result[1], result[2]] -= 1
                     diff_cts[result[2], result[1]] -= 1  
-                    trial_log.append([trial,result[0]])
+                    trial_log.append([trial,result[0], trial_clock.getTime(), replays])
                     core.wait(0.2)
             was_down = is_down
         win.flip()
@@ -1377,10 +1478,12 @@ save_free_pairings_to_excel("free_pairings_block1.xlsx")
 unisensory_triplets_block("Pre-Crossmodal")
 
 # Crossmodal with Feedback (keys: 1 = FIRST, 0 = SECOND; use left/right index fingers)
-result = crossmodal_with_feedback()
-if result == "skip":
+crossmodal_result = crossmodal_with_feedback()
+if crossmodal_result == "skip":
+    save_crossmodal_with_feedback_to_excel("Partial")
     print("Crossmodal with feedback skipped.")
-save_crossmodal_with_feedback_to_excel()
+else:
+    save_crossmodal_with_feedback_to_excel("Completed", crossmodal_result) # the duration of the block is passed as result
 
 # Unisensory Block
 unisensory_triplets_block("Post-Crossmodal")
@@ -1400,8 +1503,11 @@ save_free_pairings_to_excel("free_pairings_block2.xlsx")
 # End Survey
 run_end_survey_adv()
 
-# Save again (redundant but safe)
-save_crossmodal_with_feedback_to_excel()
+# Save crossmodal again (just in case)
+if crossmodal_result == "skip":
+    save_crossmodal_with_feedback_to_excel("Partial")
+else: 
+    save_crossmodal_with_feedback_to_excel("Completed", crossmodal_result)
 
 # Cleanup
 win.close()
