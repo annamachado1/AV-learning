@@ -708,18 +708,29 @@ def crossmodal_with_feedback():
         )
         
         # Make Gaussian Distrubution of Fixation Durations
-        mean = 0.5
-        sd = 0.125
-        n = 150
+        mean_ITI = 0.5
+        sd_ITI = 0.2
+        n_ITI = 150
+
+        mean_ISI = 0.25
+        sd_ISI = 0.1
+        n_ISI = 150
 
         # Calculate Shape and Scale factors
-        shape = (np.mean(mean) / sd) ** 2
-        scale = (sd ** 2) / np.mean(mean)   
+        shape_ITI = (np.mean(mean_ITI) / sd_ITI) ** 2
+        scale_ITI = (sd_ITI ** 2) / np.mean(mean_ITI)   
+
+        shape_ISI = (np.mean(mean_ISI) / sd_ISI) ** 2
+        scale_ISI = (sd_ISI ** 2) / np.mean(mean_ISI)
 
         # Generate Pause Durations
         np.random.seed(42)
-        interStimulusPause = np.random.gamma(shape, scale, n)
-        interTrialPause = np.random.gamma(shape, scale, n)
+        interTrialPause = np.random.gamma(shape_ITI, scale_ITI, n_ITI)
+        interStimulusPause = np.random.gamma(shape_ISI, scale_ISI, n_ISI)
+        
+        # Cap extreme values (<5% of values based on parameters)
+        interTrialPause = [min(x, 1.0) for x in interTrialPause]
+        interStimulusPause = [min(x, 0.5) for x in interStimulusPause]
 
         # Record distribute information
         participant_data["crossmodal_pause_durations"].append({
@@ -754,8 +765,11 @@ def crossmodal_with_feedback():
             progress_bar.autoDraw = True
             win.flip()
 
-            # 1) shape + sound 1 (left)
+            # 1) Inter-Trial jitter (0.5s mean)
+            win.flip()
             core.wait(interTrialPause[trial_index])
+
+            # 2) shape + sound 1 (left) (0.5s)
             img_stim_left.image = image_path
             img_stim_left.draw()
             win.flip()
@@ -763,13 +777,17 @@ def crossmodal_with_feedback():
             main_sounds[tones[0]].play()
             core.wait(STIMULUS_DURATION)
 
-            # 2) fixation
+            # 3) fixation (0.5s)
             fixation.pos = (0, 0)
             fixation.draw()
             win.flip()
+            core.wait(FIXATION_DURATION)
+
+            # 4) Inter-Stimulus jitter (0.25s mean)
+            win.flip()
             core.wait(interStimulusPause[trial_index])
 
-            # 3) shape + sound 2 (right)
+            # 5) shape + sound 2 (right) (0.5s)
             img_stim_right.image = image_path
             img_stim_right.draw()
             win.flip()
@@ -783,6 +801,7 @@ def crossmodal_with_feedback():
             win.flip()
             trial_clock.reset()
 
+            # Feedback Duration is 0.5s, handled below
             response = None
             
             while trial_clock.getTime() < 4:
@@ -813,8 +832,10 @@ def crossmodal_with_feedback():
                 participant_data["crossmodal with feedback incorrect"] += 1
                 incorrect_feedback.draw()
             win.flip()
-            core.wait(0.5)  # feedback duration
+            
+            core.wait(0.5) # FEEDBACK DURATION (0.5s)
 
+            # Record trial data
             participant_data["crossmodal_wf_log"].append({
                 "trial_index": trial_index,
                 "trial_type": "shape+2sounds",
