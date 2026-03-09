@@ -1311,7 +1311,7 @@ def triplets_block_sounds():
 
     instr_result = show_instructions(
         "INSTRUCTIONS\n\n"
-        "You will hear three sounds.\n"
+        "In this section, you will hear three sounds.\n"
         "Click the sound that you think is the odd one out.\n"
         "Press SPACEBAR to continue.",
         ["space"]
