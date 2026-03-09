@@ -140,49 +140,16 @@ def save_unimodal_to_excel(matrix, trial_log, stimuli, duration, label, order):
         print(f"Could not save matrix to Excel ({e}).")
 
 import random
+import numpy as np
 from itertools import combinations
 
-def generate_triplets_for_rdm(n_items, n_trials, min_coverage=2, seed=12345):
-    # Initialize random generator for reproducibility
-    rng = random.Random(seed)
-    
-    # Step 1: Create a list of all pairs (combinations of items)
-    all_pairs = list(combinations(range(n_items), 2))
-    
-    # Step 2: Ensure each pair appears in multiple triplets
-    pair_counts = {pair: 0 for pair in all_pairs}
-    triplets = []
-    
-    # Generate triplets ensuring each pair appears enough times
-    while len(triplets) < n_trials:
-        # Randomly sample three distinct items for a new triplet
-        triplet = tuple(sorted(rng.sample(range(n_items), 3)))
-        
-        # Get all pairs in this triplet
-        triplet_pairs = list(combinations(triplet, 2))
-        
-        # Check if all pairs in this triplet have been covered sufficiently
-        if all(pair_counts[pair] < min_coverage for pair in triplet_pairs):
-            triplets.append(triplet)
-            for pair in triplet_pairs:
-                pair_counts[pair] += 1
-    
-    return triplets
-
-n_items = 10  # Number of items
-n_trials = 60  # Number of triplets to generate
-triplets = generate_triplets_for_rdm(n_items, n_trials)
-
-# Print a few of the generated triplets
-print(triplets[:5])
+import random
+import numpy as np
+from itertools import combinations
 
 
 def check_pair_graph_connected(trial_list, n_items):
-    """
-    Sanity check: verifies that the observed pair graph is connected.
-    """
     graph = {i: set() for i in range(n_items)}
-
     for a, b, c in trial_list:
         for i, j in [(a, b), (a, c), (b, c)]:
             graph[i].add(j)
@@ -190,7 +157,6 @@ def check_pair_graph_connected(trial_list, n_items):
 
     visited = set()
     stack = [0]
-
     while stack:
         node = stack.pop()
         if node in visited:
@@ -200,8 +166,191 @@ def check_pair_graph_connected(trial_list, n_items):
 
     return len(visited) == n_items
 
-FIXED_SHAPE_TRIPLETS = generate_triplets_for_rdm(n_items=10, n_trials=60, seed=12345)
-FIXED_SOUND_TRIPLETS = generate_triplets_for_rdm(n_items=10, n_trials=60, seed=54321)
+
+def summarize_triplet_design(triplets, n_items):
+    pair_counts = {pair: 0 for pair in combinations(range(n_items), 2)}
+    item_counts = np.zeros(n_items, dtype=int)
+
+    for triplet in triplets:
+        for i in triplet:
+            item_counts[i] += 1
+        for p in combinations(triplet, 2):
+            pair_counts[p] += 1
+
+    pair_vals = np.array(list(pair_counts.values()))
+    summary = {
+        "pair_counts": pair_counts,
+        "item_counts": item_counts,
+        "pair_min": int(pair_vals.min()),
+        "pair_max": int(pair_vals.max()),
+        "pair_mean": float(pair_vals.mean()),
+        "pair_var": float(pair_vals.var()),
+        "n_zero_pairs": int(np.sum(pair_vals == 0)),
+        "item_min": int(item_counts.min()),
+        "item_max": int(item_counts.max()),
+        "item_mean": float(item_counts.mean()),
+        "item_var": float(item_counts.var()),
+        "connected": check_pair_graph_connected(triplets, n_items),
+    }
+    return summary
+
+
+def design_score(triplets, n_items, target_pair_count, target_item_count):
+    """
+    Lower is better.
+    Strongly penalizes:
+    - missing pairs
+    - uneven item counts
+    - uneven pair counts
+    - disconnected pair graph
+    """
+    summary = summarize_triplet_design(triplets, n_items)
+    pair_vals = np.array(list(summary["pair_counts"].values()))
+    item_vals = summary["item_counts"]
+
+    # Main penalties
+    zero_pair_penalty = 5000 * summary["n_zero_pairs"]
+    disconnected_penalty = 100000 if not summary["connected"] else 0
+
+    # Strong push toward equal coverage
+    pair_balance_penalty = np.sum((pair_vals - target_pair_count) ** 2)
+    item_balance_penalty = np.sum((item_vals - target_item_count) ** 2)
+
+    # Additional spread penalties
+    pair_range_penalty = 200 * (summary["pair_max"] - summary["pair_min"])
+    item_range_penalty = 500 * (summary["item_max"] - summary["item_min"])
+
+    return (
+        disconnected_penalty
+        + zero_pair_penalty
+        + pair_balance_penalty
+        + 5 * item_balance_penalty
+        + pair_range_penalty
+        + item_range_penalty
+    )
+
+
+def generate_stronger_triplets(n_items=10, n_trials=60, seed=12345, n_restarts=200, n_swap_iters=5000):
+    """
+    Stronger triplet generator using:
+    1. random initialization
+    2. local search by swap improvement
+
+    Returns:
+        best_triplets, best_pair_counts, best_item_counts
+    """
+    rng = random.Random(seed)
+    all_triplets = list(combinations(range(n_items), 3))
+
+    if n_trials > len(all_triplets):
+        raise ValueError(f"n_trials={n_trials} exceeds total possible unique triplets={len(all_triplets)}")
+
+    n_pairs = n_items * (n_items - 1) // 2
+    target_pair_count = (3 * n_trials) / n_pairs   # for 10 items, 60 trials -> 4
+    target_item_count = (3 * n_trials) / n_items   # for 10 items, 60 trials -> 18
+
+    best_triplets = None
+    best_score = float("inf")
+
+    for restart in range(n_restarts):
+        # Random initial subset
+        current = rng.sample(all_triplets, n_trials)
+        current_set = set(current)
+        current_score = design_score(current, n_items, target_pair_count, target_item_count)
+
+        # Local improvement by swaps
+        for _ in range(n_swap_iters):
+            out_triplet = rng.choice(current)
+            in_triplet = rng.choice(all_triplets)
+
+            if in_triplet in current_set:
+                continue
+
+            trial_candidate = current.copy()
+            idx = trial_candidate.index(out_triplet)
+            trial_candidate[idx] = in_triplet
+
+            candidate_score = design_score(trial_candidate, n_items, target_pair_count, target_item_count)
+
+            if candidate_score < current_score:
+                current = trial_candidate
+                current_set.remove(out_triplet)
+                current_set.add(in_triplet)
+                current_score = candidate_score
+
+                # Early exit if already very good
+                summary = summarize_triplet_design(current, n_items)
+                if (
+                    summary["connected"]
+                    and summary["n_zero_pairs"] == 0
+                    and summary["item_max"] - summary["item_min"] <= 1
+                    and summary["pair_max"] - summary["pair_min"] <= 1
+                ):
+                    break
+
+        if current_score < best_score:
+            best_score = current_score
+            best_triplets = current.copy()
+
+            summary = summarize_triplet_design(best_triplets, n_items)
+            print(
+                f"[restart {restart+1}] "
+                f"score={best_score:.1f} | "
+                f"pair range={summary['pair_min']}-{summary['pair_max']} | "
+                f"zero pairs={summary['n_zero_pairs']} | "
+                f"item range={summary['item_min']}-{summary['item_max']} | "
+                f"connected={summary['connected']}"
+            )
+
+            # Stop if nearly ideal
+            if (
+                summary["connected"]
+                and summary["n_zero_pairs"] == 0
+                and summary["item_max"] - summary["item_min"] <= 1
+                and summary["pair_max"] - summary["pair_min"] <= 1
+            ):
+                break
+
+    best_summary = summarize_triplet_design(best_triplets, n_items)
+    return best_triplets, best_summary["pair_counts"], best_summary["item_counts"]
+
+FIXED_SHAPE_TRIPLETS, shape_pair_counts, shape_item_counts = generate_stronger_triplets(
+    n_items=10,
+    n_trials=60,
+    seed=12345,
+    n_restarts=200,
+    n_swap_iters=5000
+)
+
+FIXED_SOUND_TRIPLETS, sound_pair_counts, sound_item_counts = generate_stronger_triplets(
+    n_items=10,
+    n_trials=60,
+    seed=54321,
+    n_restarts=200,
+    n_swap_iters=5000
+)
+
+print("Shape graph connected:", check_pair_graph_connected(FIXED_SHAPE_TRIPLETS, 10))
+print("Sound graph connected:", check_pair_graph_connected(FIXED_SOUND_TRIPLETS, 10))
+print("Shape pair count range:", min(shape_pair_counts.values()), max(shape_pair_counts.values()))
+print("Sound pair count range:", min(sound_pair_counts.values()), max(sound_pair_counts.values()))
+print("Shape item counts:", shape_item_counts)
+print("Sound item counts:", sound_item_counts)
+
+def print_design_summary(name, triplets, n_items=10):
+    summary = summarize_triplet_design(triplets, n_items)
+    print(f"\n{name}")
+    print("-" * len(name))
+    print("Connected:", summary["connected"])
+    print("Zero-covered pairs:", summary["n_zero_pairs"])
+    print("Pair count range:", summary["pair_min"], summary["pair_max"])
+    print("Pair mean/var:", round(summary["pair_mean"], 3), round(summary["pair_var"], 3))
+    print("Item count range:", summary["item_min"], summary["item_max"])
+    print("Item mean/var:", round(summary["item_mean"], 3), round(summary["item_var"], 3))
+    print("Item counts:", summary["item_counts"])
+
+print_design_summary("SHAPES", FIXED_SHAPE_TRIPLETS, 10)
+print_design_summary("SOUNDS", FIXED_SOUND_TRIPLETS, 10)
 
 # === End-of-experiment survey ===
 def run_end_survey():
@@ -491,20 +640,20 @@ def free_pairings_block(intro_text, version):
     ANIM_ALPHA  = 0.35  # Speed value for movement animation
 
     for i, filename in enumerate(total_shape_files):
-        if len(total_shape_files) <= 10:
-            pos = shapesrow1[i], 0.4
+        if version == "First":
+            pos = (shapesrow1[i], 0.4)
         else:
             if i < len(shapesrow1):
-                pos = shapesrow1[i], 0.6
+                pos = (shapesrow1[i], 0.6)
             else:
-                pos = shapesrow2[i - len(shapesrow1)], 0.1
+                pos = (shapesrow2[i - len(shapesrow1)], 0.1)
 
         stim = visual.ImageStim(
             win,
-            image=os.path.join(image_dir, filename),                    
-            pos= pos,
+            image=os.path.join(image_dir, filename),
+            pos=pos,
             size=(0.15, 0.25)
-            )
+        )
         shapes.append({"stim": stim, "file": filename})
 
     for i, filename in enumerate(tone_files):
@@ -791,17 +940,9 @@ def crossmodal_with_feedback():
         # Stimulus parameters
         STIMULUS_DURATION = 1.0  # Keep it as 1.0s for crossmodal block
 
-        # Calculate Shape and Scale factors
-        shape_ITI = (np.mean(mean_ITI) / sd_ITI) ** 2
-        scale_ITI = (sd_ITI ** 2) / np.mean(mean_ITI)   
-
-        shape_ISI = (np.mean(mean_ISI) / sd_ISI) ** 2
-        scale_ISI = (sd_ISI ** 2) / np.mean(mean_ISI)
-
-        # Generate Pause Durations
-        np.random.seed(42)
-        interTrialPause = np.random.normal(shape_ITI, scale_ITI, n_ITI)
-        interStimulusPause = np.random.normal(shape_ISI, scale_ISI, n_ISI)
+        # Generate non-negative Gaussian jitters centered at 500 ms
+        interTrialPause = sample_non_negative_normal(mean_ITI, sd_ITI, len(crossmodal_trials))
+        interStimulusPause = sample_non_negative_normal(mean_ISI, sd_ISI, len(crossmodal_trials))
 
         # Record distribute information
         participant_data["crossmodal_pause_durations"].append({
@@ -987,23 +1128,16 @@ def unisensory_triplets_block(version):
             save_unimodal_to_excel(diffcounts_shapes, trial_log1, stimuli, duration, "Shape", f"Second_{version}")
 
 def triplets_block_shapes():
-    # Generate 60 balanced and connected triplets for the shapes
-    trial_list = generate_triplets_for_rdm(n_items=10, n_trials=60, seed=12345)
-    random.shuffle(trial_list)  # Shuffle the triplet order for randomness
-    numtrials = len(trial_list)
-
     # Setup
     img_stim_left = visual.ImageStim(win, image=None, size=(0.3, 0.4), pos=(-0.5, 0))
     img_stim_center = visual.ImageStim(win, image=None, size=(0.3, 0.4), pos=(0, 0))
     img_stim_right = visual.ImageStim(win, image=None, size=(0.3, 0.4), pos=(0.5, 0))
     mouse = event.Mouse(win=win)
 
-    # Only the 10 canonical shapes
+    # Fixed canonical mapping: index 0 -> shape_01.png, ..., index 9 -> shape_10.png
     all_shapes = [f"shape_{i:02d}.png" for i in range(1, 11)]
     numshapes = len(all_shapes)
     image_path_list = [os.path.join(image_dir, img_file) for img_file in all_shapes]
-    image_path_list = [os.path.join(image_dir, img_file) for img_file in all_shapes]
-    random.shuffle(image_path_list)  # Randomize the order of the shapes
 
     diff_cts = np.zeros((numshapes, numshapes), dtype=int)
 
@@ -1017,7 +1151,7 @@ def triplets_block_shapes():
         alignText="center",
     )
 
-    # Same fixed 80 triplets for everyone, but shuffled fresh each run
+    # Same fixed 60 triplets for everyone, shuffled fresh each run
     trial_list = FIXED_SHAPE_TRIPLETS.copy()
     random.shuffle(trial_list)
     numtrials = len(trial_list)
@@ -1051,7 +1185,7 @@ def triplets_block_shapes():
         name="progress_bar"
     )
 
-    for trial_idx, trial in enumerate(trial_list):
+    for trial_idx, base_trial in enumerate(trial_list):
         event.clearEvents()
         if "escape" in event.getKeys(keyList=["escape"]):
             win.close()
@@ -1065,12 +1199,17 @@ def triplets_block_shapes():
             win.flip()
             return "skip"
 
+        # Randomize only the left/center/right presentation order within this trial
+        presented_trial = list(base_trial)
+        random.shuffle(presented_trial)
+        presented_trial = tuple(presented_trial)
+
         instructions.draw()
         instructions.autoDraw = True
 
-        img_stim_left.image = image_path_list[trial[0]]
-        img_stim_center.image = image_path_list[trial[1]]
-        img_stim_right.image = image_path_list[trial[2]]
+        img_stim_left.image = image_path_list[presented_trial[0]]
+        img_stim_center.image = image_path_list[presented_trial[1]]
+        img_stim_right.image = image_path_list[presented_trial[2]]
         img_stim_left.autoDraw = True
         img_stim_center.autoDraw = True
         img_stim_right.autoDraw = True
@@ -1105,15 +1244,15 @@ def triplets_block_shapes():
             buttons = mouse.getPressed()
             if any(buttons) and not any(prev_buttons):
                 if img_stim_left.contains(mouse):
-                    clicked_index = trial[0]
+                    clicked_index = presented_trial[0]
                 elif img_stim_center.contains(mouse):
-                    clicked_index = trial[1]
+                    clicked_index = presented_trial[1]
                 elif img_stim_right.contains(mouse):
-                    clicked_index = trial[2]
+                    clicked_index = presented_trial[2]
 
                 if clicked_index is not None:
                     ordered = []
-                    for stim_idx in trial:
+                    for stim_idx in presented_trial:
                         if stim_idx == clicked_index:
                             ordered.insert(0, stim_idx)
                         else:
@@ -1129,7 +1268,7 @@ def triplets_block_shapes():
                     diff_cts[ordered[1], ordered[2]] -= 1
                     diff_cts[ordered[2], ordered[1]] -= 1
 
-                    trial_log.append([trial, ordered[0]])
+                    trial_log.append([presented_trial, ordered[0]])
                     break
 
             prev_buttons = buttons
@@ -1160,21 +1299,14 @@ def triplets_block_sounds():
     numsounds = len(all_sounds)
     diff_cts = np.zeros((numsounds, numsounds), dtype=int)
 
-    # Generate 60 balanced and connected triplets for the sounds
-    trial_list = generate_triplets_for_rdm(n_items=10, n_trials=60, seed=54321)
-    random.shuffle(trial_list)  # Shuffle the triplet order for randomness
+    trial_list = FIXED_SOUND_TRIPLETS.copy()
+    random.shuffle(trial_list)
     numtrials = len(trial_list)
-
-    # Inside the trial loop, shuffle the tones within each triplet
-    for i in range(numtrials):
-        trial = list(trial_list[i])  # Convert the tuple to a list
-        random.shuffle(trial)  # Shuffle the tones in each trial (this is important)
-        trial_list[i] = tuple(trial)  # Convert back to a tuple
+    trial_log = []
 
     print(f"Sound triplets shown: {numtrials}")
     print(f"Sound graph connected: {check_pair_graph_connected(FIXED_SOUND_TRIPLETS, numsounds)}")
 
-    # Time duration for sounds in the Unisensory Triplet Block
     STIMULUS_DURATION_UNISENSORY = 0.8
 
     instr_result = show_instructions(
@@ -1255,14 +1387,20 @@ def triplets_block_sounds():
 
     mouse = event.Mouse(win=win)
 
-    for trial_idx, trial in enumerate(trial_list):
+    for trial_idx, base_trial in enumerate(trial_list):
         event.clearEvents()
         mouse.clickReset()
+
         if "escape" in event.getKeys(keyList=["escape"]):
             win.close()
             core.quit()
         if "s" in event.getKeys(keyList=["s"]):
             return "skip"
+
+        # Randomize only the presentation order within this triplet
+        presented_trial = list(base_trial)
+        random.shuffle(presented_trial)
+        presented_trial = tuple(presented_trial)
 
         for n in notes:
             n.draw()
@@ -1278,24 +1416,24 @@ def triplets_block_sounds():
         instructions.draw()
         instructions.autoDraw = True
 
-        main_sounds[all_sounds[trial[0]]].stop()
-        main_sounds[all_sounds[trial[0]]].play()
+        main_sounds[all_sounds[presented_trial[0]]].stop()
+        main_sounds[all_sounds[presented_trial[0]]].play()
         highlight = highlight_note(notes[0])
         highlight.draw()
         notes[0].draw()
         win.flip()
         core.wait(STIMULUS_DURATION_UNISENSORY + 0.4)
 
-        main_sounds[all_sounds[trial[1]]].stop()
-        main_sounds[all_sounds[trial[1]]].play()
+        main_sounds[all_sounds[presented_trial[1]]].stop()
+        main_sounds[all_sounds[presented_trial[1]]].play()
         highlight = highlight_note(notes[1])
         highlight.draw()
         notes[1].draw()
         win.flip()
         core.wait(STIMULUS_DURATION_UNISENSORY + 0.4)
 
-        main_sounds[all_sounds[trial[2]]].stop()
-        main_sounds[all_sounds[trial[2]]].play()
+        main_sounds[all_sounds[presented_trial[2]]].stop()
+        main_sounds[all_sounds[presented_trial[2]]].play()
         highlight = highlight_note(notes[2])
         highlight.draw()
         notes[2].draw()
@@ -1320,6 +1458,10 @@ def triplets_block_sounds():
                 win.flip()
                 return "skip"
 
+            rone_rect.fillColor = "#4C7BF1" if canreplay1 else "#565656"
+            rtwo_rect.fillColor = "#4C7BF1" if canreplay2 else "#565656"
+            rthree_rect.fillColor = "#4C7BF1" if canreplay3 else "#565656"
+
             rone_rect.draw(); rone_text.draw()
             rtwo_rect.draw(); rtwo_text.draw()
             rthree_rect.draw(); rthree_text.draw()
@@ -1327,26 +1469,22 @@ def triplets_block_sounds():
 
             is_down = mouse.getPressed()[0] == 1
 
-            rone_rect.fillColor = "#4C7BF1" if canreplay1 else "#565656"
-            rtwo_rect.fillColor = "#4C7BF1" if canreplay2 else "#565656"
-            rthree_rect.fillColor = "#4C7BF1" if canreplay3 else "#565656"
-
             if is_down and not was_down:
                 if notes[0].contains(mouse):
-                    result = [trial[0], trial[1], trial[2]]
+                    result = [presented_trial[0], presented_trial[1], presented_trial[2]]
                     clicked = True
                 elif notes[1].contains(mouse):
-                    result = [trial[1], trial[0], trial[2]]
+                    result = [presented_trial[1], presented_trial[0], presented_trial[2]]
                     clicked = True
                 elif notes[2].contains(mouse):
-                    result = [trial[2], trial[0], trial[1]]
+                    result = [presented_trial[2], presented_trial[0], presented_trial[1]]
                     clicked = True
 
                 elif (abs(mouse.getPos()[0] - rone_rect.pos[0]) <= rone_rect.width / 2 and
                       abs(mouse.getPos()[1] - rone_rect.pos[1]) <= rone_rect.height / 2):
                     if canreplay1:
-                        main_sounds[all_sounds[trial[0]]].stop()
-                        main_sounds[all_sounds[trial[0]]].play()
+                        main_sounds[all_sounds[presented_trial[0]]].stop()
+                        main_sounds[all_sounds[presented_trial[0]]].play()
                         highlight = highlight_note(notes[0])
                         highlight.draw()
                         win.flip()
@@ -1356,8 +1494,8 @@ def triplets_block_sounds():
                 elif (abs(mouse.getPos()[0] - rtwo_rect.pos[0]) <= rtwo_rect.width / 2 and
                       abs(mouse.getPos()[1] - rtwo_rect.pos[1]) <= rtwo_rect.height / 2):
                     if canreplay2:
-                        main_sounds[all_sounds[trial[1]]].stop()
-                        main_sounds[all_sounds[trial[1]]].play()
+                        main_sounds[all_sounds[presented_trial[1]]].stop()
+                        main_sounds[all_sounds[presented_trial[1]]].play()
                         highlight = highlight_note(notes[1])
                         highlight.draw()
                         win.flip()
@@ -1367,8 +1505,8 @@ def triplets_block_sounds():
                 elif (abs(mouse.getPos()[0] - rthree_rect.pos[0]) <= rthree_rect.width / 2 and
                       abs(mouse.getPos()[1] - rthree_rect.pos[1]) <= rthree_rect.height / 2):
                     if canreplay3:
-                        main_sounds[all_sounds[trial[2]]].stop()
-                        main_sounds[all_sounds[trial[2]]].play()
+                        main_sounds[all_sounds[presented_trial[2]]].stop()
+                        main_sounds[all_sounds[presented_trial[2]]].play()
                         highlight = highlight_note(notes[2])
                         highlight.draw()
                         win.flip()
@@ -1384,7 +1522,7 @@ def triplets_block_sounds():
                     diff_cts[result[1], result[2]] -= 1
                     diff_cts[result[2], result[1]] -= 1
 
-                    trial_log.append([trial, result[0]])
+                    trial_log.append([presented_trial, result[0]])
                     core.wait(0.2)
 
             was_down = is_down
